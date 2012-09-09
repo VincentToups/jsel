@@ -62,11 +62,39 @@
 (defpattern jsel:context-agnostic ()
   '(or :statement :expression :either))
 
-(defun-match- jsel:transcode ((p #'jsel:non-keyword-symbolp s) (or :statement :expression :either))
+(defun-match- jsel:transcode ('undefined (jsel:context-agnostic))
+  (jsel:insert "undefined"))
+
+(defun-match jsel:transcode ('true (jsel:context-agnostic))
+  (jsel:insert "true"))
+
+(defun-match jsel:transcode ('empty-object (jsel:context-agnostic))
+  (jsel:insert "{}"))
+
+(defun-match jsel:transcode ('false (jsel:context-agnostic))
+  (jsel:insert "false"))
+
+(defun-match jsel:transcode ('null (jsel:context-agnostic))
+  (jsel:insert "null"))
+
+(defun-match jsel:transcode ((p #'jsel:non-keyword-symbolp s) (or :statement :expression :either))
   (jsel:insert (jsel:mangle s)))
+
+(defun jsel:remove-colon-from-keyword (s)
+  (let ((n (symbol-name s)))
+	(intern (substring n 1))))
+
+(defun-match jsel:transcode ((p #'keywordp s) (or :statement :expression :either))
+  (jsel:insert (concat "\"" (jsel:mangle (jsel:remove-colon-from-keyword s)) "\"")))
 
 (defun-match jsel:transcode (_)
   (jsel:transcode _ :either))
+
+(defun-match jsel:transcode ((p #'vectorp vector-expression) (jsel:context-agnostic))
+  (let ((elements (coerce vector-expression 'list)))
+	(jsel:insert "[")
+	(jsel:transcode-csvs elements)
+	(jsel:insert "]")))
 
 (defun-match jsel:transcode ((list 'var sym expr) (or :statement :either))
   (jsel:insertf "var %s = " (jsel:mangle sym))
@@ -96,6 +124,13 @@
   (jsel:newline)
   (recur rest))
 
+(defun jsel:transcode-block (statements)
+  (jsel:with-tab+ 
+   (jsel:insert "{")
+   (jsel:newline)
+   (jsel:transcode-newline-sequence statements)
+   (jsel:insert "}")))
+
 (defun-match jsel:transcode ((list 'if expr true-branch false-branch) (jsel:context-agnostic))
   (jsel:insert "((")
   (jsel:transcode expr)
@@ -114,20 +149,6 @@
   (jsel:transcode 'undefined)
   (jsel:insert "))"))
 
-(defun-match jsel:transcode ('undefined (jsel:context-agnostic))
-  (jsel:insert "undefined"))
-
-(defun-match jsel:transcode ('true (jsel:context-agnostic))
-  (jsel:insert "true"))
-
-(defun-match jsel:transcode ('empty-object (jsel:context-agnostic))
-  (jsel:insert "{}"))
-
-(defun-match jsel:transcode ('false (jsel:context-agnostic))
-  (jsel:insert "false"))
-
-(defun-match jsel:transcode ('null (jsel:context-agnostic))
-  (jsel:insert "null"))
 
 (defun-match jsel:transcode ((p #'numberp n) (jsel:context-agnostic))
   (jsel:insertf "%s" n))
@@ -142,7 +163,62 @@
   (jsel:transcode expr)
   (jsel:insert ")"))
 
-(defun-match jsel:transcode ((list 'setq 
+(defun-match jsel:transcode ((list-rest 'primitive-for-in 
+										(list (symbol index)
+											  expr)
+										body)
+							 (jsel:context-agnostic))
+  (jsel:insert "for (")
+  (jsel:transcode index)
+  (jsel:insert " in ")
+  (jsel:transcode expr)
+  (jsel:insert ")")
+  (jsel:transcode-block body))
+
+(defun-match jsel:transcode ((list-rest 'primitive-for
+										(list init condexpr updateexpr)
+										body)
+							 (jsel:context-agnostic))
+  (jsel:insert "for (")
+  (jsel:transcode init)
+  (jsel:insert "; ")
+  (jsel:transcode condexpr)
+  (jsel:insert "; ")
+  (jsel:transcode updateexpr)
+  (jsel:insert ")")
+  (jsel:transcode-block body))
+
+(defun-match jsel:transcode ((list-rest 
+							  'for (list (symbol index) :in expr) 
+							  body)
+							 (jsel:context-agnostic))
+  (jsel:transcode `(let () (primitive-for-in (,index ,expr) 
+									 (let ((,index ,index))
+									   ,@body))
+						undefined)))
+
+(defun-match jsel:transcode ((list-rest 
+							  'for (list (list (symbol index)
+											   (symbol element))
+										 :in
+										 expr)
+							  body)
+							 (jsel:context-agnostic))
+  (let ((iteratable (gensym "iteratable-"))) 
+	(jsel:transcode `(let ((,iteratable ,expr)) 
+					   (primitive-for-in 
+						(,index ,iteratable)
+						(let ((,index ,index)
+							  (,element ([] ,iteratable ,index)))
+						  ,@body)
+						) undefined))))
+
+(defun jsel:empty-vectorp (o)
+  (and (vectorp o)
+	   (= 0 (length o))))
+
+
+(defun-match jsel:transcode ((list 'primitive-setq 
 								   (p #'symbolp name) 
 								   expr) 
 							 (jsel:context-agnostic))
@@ -151,11 +227,58 @@
   (jsel:transcode expr)
   (jsel:insert ")"))
 
+(defun jsel:single-element-vectorp (o)
+  (and (vectorp o)
+	   (= 1 (length o))))
+
+(defun-match jsel:transcode ((list (or 'access 
+									   (p #'jsel:empty-vectorp)) object expr)
+							 (jsel:context-agnostic))
+  (jsel:insert "(")
+  (jsel:transcode object)
+  (jsel:insert ")[")
+  (jsel:transcode expr)
+  (jsel:insert "]"))
+
+(defun-match jsel:transcode ((list-rest (or 'access (p #'jsel:empty-vectorp)) object expr0 exprs)
+							 (jsel:context-agnostic))
+  (recur `([] ([] ,object ,expr0) ,@exprs) :either))
+
+(defun-match jsel:transcode ((list 'primitive-setq 
+								   (p #'symbolp name)
+								   (p #'jsel:single-element-vectorp vec)
+								   expr)
+							 (jsel:context-agnostic))
+  (jsel:transcode name)
+  (jsel:insert "[")
+  (jsel:transcode (elt vec 0))
+  (jsel:insert "]")
+  (jsel:insert " = (")
+  (jsel:transcode expr)
+  (jsel:insert ")"))
+
+(defun-match jsel:transcode ((list-rest 'setq args) (jsel:context-agnostic))
+  (jsel:transcode `(let () (primitive-setq ,@args) undefined)))
+
+(defun jsel:at-sign-p (o)
+  (and (symbolp o)
+	   (equal o (intern "@"))))
+
+(defun-match jsel:transcode ((list-rest '.. expr symbols) (jsel:context-agnostic))
+  (jsel:insert "(")
+  (jsel:transcode expr)
+  (jsel:insert ")")
+  (loop for symbol in symbols do
+		(jsel:insert ".")
+		(jsel:transcode symbol)))
+
 (defun-match- jsel:valid-bindings (nil)
   t)
+
 (defun-match jsel:valid-bindings ((list-rest (list pat expr) rest))
   (if (symbolp pat) (recur rest)
 	nil))
+
 (defun-match jsel:valid-bindings (_) nil)
 
 (defun-match jsel:transcode ((list-rest 'funcall f-expression args)
@@ -177,13 +300,16 @@
 					  (lambda ,args ,@body)
 					  ,@vals))))
 
+(defun-match jsel:transcode ((list-rest 
+							  'new 
+							  (non-kw-symbol constructor)
+							  arguments) (jsel:context-agnostic))
+  (jsel:insert "(new ")
+  (jsel:transcode constructor)
+  (jsel:insert "(")
+  (jsel:transcode-csvs arguments)
+  (jsel:insert "))"))
 
-
-(defun-match jsel:transcode ((list-rest 'object k/v-pairs)
-							 (jsel:context-agnostic))
-  (let ((temp-name (gensym "temp-object-")))
-	`(let ((,temp-object empty-object))
-	   ())))
 
 (defun jsel:make-last-statement-a-return (list)
   "Make the last statement of something a return."
@@ -212,21 +338,84 @@
 	(jsel:make-last-statement-a-return body)))
   (jsel:insert "}"))
 
-(defun-match jsel:transcode ((list 'define (p #'symbolp name) value) (jsel:context-agnostic))
+(defun-match jsel:transcode ((list 'def (p #'symbolp name) value) (jsel:context-agnostic))
   (jsel:transcode `(var ,name ,value)))
 
-(defun-match jsel:transcode ((list-rest 'define (list-rest (p #'symbolp name) args) body) (jsel:context-agnostic))
+(defun-match jsel:transcode ((list-rest 'def (list-rest (p #'symbolp name) args) body) (jsel:context-agnostic))
   (jsel:transcode `(var ,name (lambda ,args ,@body))))
 
 (defun-match jsel:transcode ((list-rest 'program body) (jsel:context-agnostic))
   (jsel:transcode-newline-sequence body))
 
-(defun-match jsel:transcode ((p #'vectorp vector-expression) (jsel:context-agnostic))
-  (let ((elements (coerce vector-expression 'list)))
-	(jsel:insert "[")
-	(jsel:transcode-csvs elements)
-	(jsel:insert "]")))
 
+(defvar jsel:macros (make-hash-table :test 'equal))
+(defun jsel:macro-symbolp (s)
+  (gethash s jsel:macros))
+
+(defun-match jsel:transcode ((list-rest 'defmacro name args body)
+							 (jsel:context-agnostic))
+  (let ((arg-name (gensym "macro-arg-names-")))
+	(puthash name
+			 (eval `(lambda (&rest ,arg-name) 
+					  (destructuring-bind ,args ,arg-name ,@body)))
+			 jsel:macros)))
+
+(defun-match jsel:transcode ((list-rest (p #'jsel:macro-symbolp dispatch-key) arguments)
+							 (jsel:context-agnostic))
+  (jsel:transcode (apply (gethash dispatch-key jsel:macros) arguments)))
+
+(defmacro* jsel:defmacro (name arglist &body body)
+  (let ((arg-name (gensym "defmacro-args-")))
+	`(puthash ',name (lambda (&rest ,arg-name)
+					   (destructuring-bind ,arglist ,arg-name ,@body))
+			  jsel:macros)))
+
+(jsel:defmacro let* (bindings &body body)
+			   (let ((expressions (mapcar #'cadr bindings))
+					 (symbols (mapcar #'car bindings)))
+				 `(let ,(loop for symbol in symbols collect `(,symbol undefined))
+					,@(loop for (symbol expression) 
+							in bindings collect `(setq ,symbol ,expression))
+					,@body)))
+
+(defun-match- jsel:bunch-by-two (nil acc)
+  (reverse acc))
+
+(defun-match jsel:bunch-by-two ((list a) acc)
+  (error "jsel:bunch-by-two needs a list with an even number of elements."))
+
+(defun-match jsel:bunch-by-two ((list a b) acc)
+  (reverse (cons (list a b) acc)))
+
+(defun-match jsel:bunch-by-two ((list-rest a b rest) acc)
+  (recur rest (cons (list a b) acc)))
+
+(defun-match jsel:bunch-by-two (the-list)
+  (recur the-list nil))
+
+(jsel:defmacro progn 
+			   (&body body)
+			   `(let () ,@body))
+
+(jsel:defmacro 
+ object 
+ (&rest kv/pairs)
+ (let ((object-name (gensym "object"))
+	   (pairs (jsel:bunch-by-two kv/pairs)))
+   `(let ((,object-name empty-object))
+	  ,@(loop for (index-expr value-expr) in pairs
+			  collect `(setq ,object-name ,(vector index-expr) ,value-expr))
+	  ,object-name)))
+
+(jsel:defmacro 
+ cond
+ (&body body)
+ (match body
+		((list)
+		 '(throw "Cond fell through without any branch being true."))
+		((list-rest (list-rest test-value sub-body) rest)
+		 `(if ,test-value (progn ,@sub-body)
+			(cond ,@rest)))))
 
 ;;; SHOULD BE LAST ;;;
 
@@ -236,10 +425,31 @@
   (jsel:transcode-csvs args)
   (jsel:insert ")"))
 
+(defun jsel:read-buffer (buffer)
+  (with-current-buffer buffer
+	(let* ((all (buffer-substring-no-properties (point-min) (point-max)))
+		   (all (concat "(" all ")")))
+	  (match (read-from-string all)
+			 ((cons s-expr last-index)
+			  s-expr)
+			 (_ (error "Some problem reading string %S." all))))))
 
+(defun jsel:jsel-file->js-file (filename)
+  (match filename
+		 ((concat root ".jsel")
+		  (concat root ".js"))
+		 (_ (concat _ ".js"))))
 
-
-
-
-
+(defun* jsel:transcode-file (file &optional (output-name nil))
+  ""
+  (let* ((already-open (find-buffer-visiting file))
+		 (buffer (find-file-noselect file))
+		 (s-expr (jsel:read-buffer buffer))
+		 (output-name (if output-name 
+						  output-name
+						(jsel:jsel-file->js-file file)))
+		 (output-buffer (find-file output-name)))
+	(with-current-buffer output-buffer
+	  (delete-region (point-min) (point-max))
+	  (jsel:transcode (cons 'program s-expr)))))
 

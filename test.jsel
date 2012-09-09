@@ -1,0 +1,7 @@
+(def x 10)
+(def y 11)
+"a comment of some kind"
+(def (Sparkly-Thing a b)
+     [a b x y])
+
+(new Sparkly-Thing 1 2)
