@@ -1,7 +1,31 @@
 (def x 10)
 (def y 11)
-"a comment of some kind"
-(def (Sparkly-Thing a b)
-     [a b x y])
 
-(new Sparkly-Thing 1 2)
+(def (< a b)
+	 (literally "a<b"))
+
+(def (> a b)
+	 (literally "a>b"))
+
+(def (+-primitive a b)
+	 (literally "a+b"))
+
+(def (+)
+	 (let ((result 0)
+		   (arg-array ((.. [] slice apply) arguments)))
+	   (for ((index element) :in arg-array)
+			(setq result (+-primitive result element)))
+	   result))
+
+(+ 1 2 3 4 5)
+
+(def z 
+	 (let ((x 10))
+	   (setq x 11)
+	   x))
+(def r (let ((a [ 1 2 3 4])
+			 (o 0))
+		 (for ((index element) :in a)
+			  (setq o (+-primitive o element)))
+		 o))
+

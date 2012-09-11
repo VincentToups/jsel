@@ -213,6 +213,26 @@
 						  ,@body)
 						) undefined))))
 
+(defun-match jsel:transcode ((list-rest 
+							  'for
+							  (list init condexpr updateexpr)
+							  body)
+							 (jsel:context-agnostic))
+  (jsel:transcode `(let ()
+					 (primitive-for (,init ,condexpr ,updateexpr) ,@body))))
+
+(defun-match jsel:transcode ((list-rest 'primitive-while condexpr body)
+							 (jsel:context-agnostic))
+  (jsel:insert "while (")
+  (jsel:transcode condexpr)
+  (jsel:insert ")")
+  (jsel:transcode-block body))
+
+(defun-match jsel:transcode ((list-rest 'while condexpr body) 
+							 (jsel:context-agnostic))
+  (jsel:transcode `(let () (primitive-while ,condexpr ,@body) undefined) :either))
+
+
 (defun jsel:empty-vectorp (o)
   (and (vectorp o)
 	   (= 0 (length o))))
@@ -271,6 +291,32 @@
   (loop for symbol in symbols do
 		(jsel:insert ".")
 		(jsel:transcode symbol)))
+
+(defun-match- jsel:split-list-at (sigil (list) acc)
+  (list (reverse acc) nil))
+
+(defun-match jsel:split-list-at (sigil (list))
+  (list nil nil))
+
+(defun-match jsel:split-list-at (sigil (list-rest (equal sigil _) tl) acc)
+  (list (reverse acc) tl))
+
+(defun-match jsel:split-list-at (sigil (list-rest hd tl) acc)
+  (recur sigil tl (cons hd acc)))
+
+(defun-match jsel:split-list-at (sigil lst)
+  (recur sigil lst nil))
+
+(defun-match jsel:transcode ((list-rest '..* (symbol delim) arguments)
+							 (and (jsel:context-agnostic) context))
+  (recur 
+   (match (jsel:split-list-at delim arguments)
+		  ((list before after)
+		   `((.. ,@before) ,@after))) context))
+
+(defun-match jsel:transcode ((list-rest '.: arguments)
+							 (and (jsel:context-agnostic) context))
+  (recur `(..* : ,@arguments) context))
 
 (defun-match- jsel:valid-bindings (nil)
   t)
@@ -338,6 +384,25 @@
 	(jsel:make-last-statement-a-return body)))
   (jsel:insert "}"))
 
+(defun-match- jsel:concat-newlines ((list))
+  "")
+
+(defun-match jsel:concat-newlines ((list) acc)
+  acc)
+
+(defun-match jsel:concat-newlines ((list-rest hd tl) acc)
+  (recur tl (concat acc hd (format "\n"))))
+
+(defun-match jsel:concat-newlines ((p #'listp lst))
+  (recur lst ""))
+
+(defun-match jsel:transcode ((list-rest 'comment strings) (jsel:context-agnostic))
+  (jsel:insert (jsel:concat-newlines (append  (list "/*") strings (list "*/")))))
+
+(defun-match jsel:transcode ((list 'function expr) (jsel:context-agnostic))
+  (let ((arg (gensym "sharp-quote-arg-")))
+	(recur `(lambda (,arg) ([] ,arg ,expr)))))
+
 (defun-match jsel:transcode ((list 'def (p #'symbolp name) value) (jsel:context-agnostic))
   (jsel:transcode `(var ,name ,value)))
 
@@ -347,6 +412,9 @@
 (defun-match jsel:transcode ((list-rest 'program body) (jsel:context-agnostic))
   (jsel:transcode-newline-sequence body))
 
+(defun-match jsel:transcode ((list 'literally string)
+							 (jsel:context-agnostic))
+  (jsel:insert string))
 
 (defvar jsel:macros (make-hash-table :test 'equal))
 (defun jsel:macro-symbolp (s)
@@ -420,7 +488,9 @@
 ;;; SHOULD BE LAST ;;;
 
 (defun-match jsel:transcode ((list-rest fun args) (jsel:context-agnostic))
-  (jsel:insert (jsel:mangle fun))
+  (jsel:insert "(")
+  (jsel:transcode fun)
+  (jsel:insert ")")
   (jsel:insert "(")
   (jsel:transcode-csvs args)
   (jsel:insert ")"))
@@ -453,3 +523,10 @@
 	  (delete-region (point-min) (point-max))
 	  (jsel:transcode (cons 'program s-expr)))))
 
+(defun* jsel:transcode-current-buffer ()
+  (interactive)
+  (with-current-buffer (current-buffer)
+	(save-buffer)
+	(jsel:transcode-file (buffer-file-name (current-buffer)))))
+
+(provide 'jsel)

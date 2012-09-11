@@ -1,0 +1,62 @@
+(def (primitive-+ a b)
+	 (literally "a+b"))
+
+(def (primitive-- a b)
+	 (literally "a-b"))
+
+(def (primitive-/ a b)
+	 (literally "a/b"))
+
+(def (primitive-* a b)
+	 (literally "a*b"))
+
+(def (foldl f<it&ac> init a)
+	 (for ((index element) :in a)
+		  (setq init (f<it&ac> element init)))
+	 init)
+
+(def (arguments->array an-arguments)
+	 ((.. [] slice apply) an-arguments))
+
+(comment "+ takes any number of arguments.")
+(def (+ )
+	 (foldl primitive-+ 0 (arguments->array arguments)))
+
+(def first #'0)
+(def second #'1)
+(def third #'2)
+(def fourth #'3)
+(def fifth #'4)
+(def sixth #'5)
+(def seventh #'6)
+(def (nth n a)
+	 (#'n a))
+
+(def (rest a)
+	 (a.slice 1))
+
+(comment "- takes any number of arguments")
+(def (- )
+	 (let ((args-array (arguments->array arguments))) 
+	   (primitive-- (first args-array)
+					(foldl primitive-+ 0
+						   (rest args-array)))))
+
+(comment "* takes any number of arguments.")
+(def (* )
+	 (foldl primitive-* 1 (arguments->array arguments)))
+
+(comment "simple-apply takes a function and an array.")
+(def (simple-apply f a)
+	 (f.apply f a))
+
+(comment "/ takes any number of arguments")
+(def (/ )
+	 (primitive-/ (first arguments)
+				  (foldl primitive-* 1
+						 (rest (arguments->array arguments)))))
+
+(def (primitive-=== a b)
+	 (literally "a===b"))
+
+()
