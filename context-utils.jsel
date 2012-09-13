@@ -1,0 +1,8 @@
+(defmacro with-saved-context 
+  (context &rest body)
+  (let ((context-name (gensym)))
+	`(let ((,context-name ,context))
+	   (.: ,context-name save :)
+	   ,@body
+	   (.: ,context-name restore :))))
+

@@ -1,3 +1,8 @@
+;
+/*
+Include: stdlib.jsel
+*/
+;
 var primitiveminusplus = function(a, b) {
   return (a+b);
   };
@@ -11,14 +16,14 @@ var primitiveminustimes = function(a, b) {
   return (a*b);
   };
 var foldl = function(flessThanitampersandacgreaterThan, init, a) {
-  ((function(iteratableminus39749) {
-      for (index in iteratableminus39749)      {
+  ((function(iteratableminus18574) {
+      for (index in iteratableminus18574)      {
       ((function(index, element) {
               return (((function() {
                   init = ((flessThanitampersandacgreaterThan)(element, init));
           return (undefined);
           })()));
-        })(index, (iteratableminus39749)[index]));
+        })(index, (iteratableminus18574)[index]));
       };
     return (undefined);
     })(a));
@@ -34,30 +39,30 @@ var argumentsminusgreaterThanarray = function(anArguments) {
 var plus = function() {
   return ((foldl)(primitiveminusplus, 0, (argumentsminusgreaterThanarray)(arguments)));
   };
-var first = function(sharpQuoteArgminus39750) {
-  return ((sharpQuoteArgminus39750)[0]);
+var first = function(sharpQuoteArgminus18575) {
+  return ((sharpQuoteArgminus18575)[0]);
   };
-var second = function(sharpQuoteArgminus39751) {
-  return ((sharpQuoteArgminus39751)[1]);
+var second = function(sharpQuoteArgminus18576) {
+  return ((sharpQuoteArgminus18576)[1]);
   };
-var third = function(sharpQuoteArgminus39752) {
-  return ((sharpQuoteArgminus39752)[2]);
+var third = function(sharpQuoteArgminus18577) {
+  return ((sharpQuoteArgminus18577)[2]);
   };
-var fourth = function(sharpQuoteArgminus39753) {
-  return ((sharpQuoteArgminus39753)[3]);
+var fourth = function(sharpQuoteArgminus18578) {
+  return ((sharpQuoteArgminus18578)[3]);
   };
-var fifth = function(sharpQuoteArgminus39754) {
-  return ((sharpQuoteArgminus39754)[4]);
+var fifth = function(sharpQuoteArgminus18579) {
+  return ((sharpQuoteArgminus18579)[4]);
   };
-var sixth = function(sharpQuoteArgminus39755) {
-  return ((sharpQuoteArgminus39755)[5]);
+var sixth = function(sharpQuoteArgminus18580) {
+  return ((sharpQuoteArgminus18580)[5]);
   };
-var seventh = function(sharpQuoteArgminus39756) {
-  return ((sharpQuoteArgminus39756)[6]);
+var seventh = function(sharpQuoteArgminus18581) {
+  return ((sharpQuoteArgminus18581)[6]);
   };
 var nth = function(n, a) {
-  return ((function(sharpQuoteArgminus39757) {
-      return ((sharpQuoteArgminus39757)[n]);
+  return ((function(sharpQuoteArgminus18582) {
+      return ((sharpQuoteArgminus18582)[n]);
     })(a));
   };
 var rest = function(a) {
@@ -97,12 +102,45 @@ var primitiveminusequalequalequal = function(a, b) {
   return (a===b);
   };
 var log = function() {
-  return (((function(iteratableminus39758) {
-      for (index in iteratableminus39758)      {
+  return (((function(iteratableminus18583) {
+      for (index in iteratableminus18583)      {
       ((function(index, element) {
               return ((console.log)(element));
-        })(index, (iteratableminus39758)[index]));
+        })(index, (iteratableminus18583)[index]));
       };
     return (undefined);
     })((argumentsminusgreaterThanarray)(arguments))));
   };
+;
+/*
+document.addEventListener('DOMContentLoaded',function(){})
+*/
+;
+(document.addEventListener)("DOMContentLoaded", function() {
+  (log)("Simple ready works.");
+  var canvas = ((document).getElementById)("canvas");
+  var context = ((canvas).getContext)("2d");
+  ((function() {
+      context.font = ("38pt Arial");
+    return (undefined);
+    })());
+  ((function() {
+      context.fillStyle = ("cornflowerblue");
+    return (undefined);
+    })());
+  ((function() {
+      context.strokeStyle = ("blue");
+    return (undefined);
+    })());
+  ((function(x, y) {
+      ((context).fillText)("Hello Jsel", x, y);
+    return (((context).strokeText)("Hello Jsel", x, y));
+    })((minus)((divide)(canvas.width, 2), 150), (plus)((divide)(canvas.height, 2), 15)));
+  return (((function(x) {
+      ((function() {
+          x = ((plus)(1, x));
+      return (undefined);
+      })());
+    return ((log)("x is: ", x));
+    })(0)));
+  });

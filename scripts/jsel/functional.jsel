@@ -1,0 +1,7 @@
+(define 
+  (lambda ()
+	(def (f-and f1 f2)
+		 (lambda ()
+		   (and (f1.call f1 arguments)
+				(f2.call f2 arguments))))
+	(object 'f-and f-and)))

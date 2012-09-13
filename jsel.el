@@ -193,8 +193,8 @@
 							  body)
 							 (jsel:context-agnostic))
   (jsel:transcode `(let () (primitive-for-in (,index ,expr) 
-									 (let ((,index ,index))
-									   ,@body))
+											 (let ((,index ,index))
+											   ,@body))
 						undefined)))
 
 (defun-match jsel:transcode ((list-rest 
@@ -349,7 +349,8 @@
 (defun-match jsel:transcode ((list-rest 
 							  'new 
 							  (non-kw-symbol constructor)
-							  arguments) (jsel:context-agnostic))
+							  arguments) 
+							 (jsel:context-agnostic))
   (jsel:insert "(new ")
   (jsel:transcode constructor)
   (jsel:insert "(")
@@ -415,6 +416,11 @@
 (defun-match jsel:transcode ((list 'literally string)
 							 (jsel:context-agnostic))
   (jsel:insert string))
+
+(defun-match jsel:transcode ((list-rest 'primitive-include files)
+							 (jsel:context-agnostic))
+  (loop for file in files do
+		(jsel:transcode-file-here file (current-buffer))))
 
 (defvar jsel:macros (make-hash-table :test 'equal))
 (defun jsel:macro-symbolp (s)
@@ -485,6 +491,41 @@
 		 `(if ,test-value (progn ,@sub-body)
 			(cond ,@rest)))))
 
+(defun-match- jsel:get-module-variable-names (nil acc)
+  (reverse acc))
+(defun-match jsel:get-module-variable-names ((list-rest (string name) tl) acc)
+  (recur tl (cons (intern name) acc)))
+(defun-match jsel:get-module-variable-names ((list-rest (symbol name) tl) acc)
+  (recur tl (cons name acc)))
+(defun-match jsel:get-module-variable-names ((list-rest (list module-loc module-name) tl)
+											 acc)
+  (recur tl (cons module-name acc)))
+(defun-match jsel:get-module-variable-names (expressions)
+  (recur expressions nil))
+
+(defun-match- jsel:get-module-locations (nil acc)
+  (reverse acc))
+(defun-match jsel:get-module-locations ((list-rest (string loc) tl) acc)
+  (recur tl (cons loc acc)))
+(defun-match jsel:get-module-locations ((list-rest (symbol loc) tl) acc)
+  (recur tl (cons (symbol-name loc) acc)))
+(defun-match jsel:get-module-locations ((list-rest 
+										 (list loc sym)
+										 tl)
+										acc)
+  (recur tl (cons (if (stringp loc) loc
+					(symbol-name loc)) acc)))
+(defun-match jsel:get-module-locations (expressions)
+  (recur expressions nil))
+
+(jsel:defmacro 
+ with-modules (module-spec &body body)
+ (let ((module-variable-names (jsel:get-module-variable-names module-spec))
+	   (module-locations (jsel:get-module-locations module-spec)))
+   `(require [,@module-locations]
+			 (lambda (,@module-variable-names)
+			   ,@body))))
+
 ;;; SHOULD BE LAST ;;;
 
 (defun-match jsel:transcode ((list-rest fun args) (jsel:context-agnostic))
@@ -521,7 +562,19 @@
 		 (output-buffer (find-file output-name)))
 	(with-current-buffer output-buffer
 	  (delete-region (point-min) (point-max))
-	  (jsel:transcode (cons 'program s-expr)))))
+	  (jsel:transcode (cons 'program s-expr))
+	  (save-buffer))
+	(if (not already-open)
+		(kill-buffer already-open))))
+
+(defun* jsel:transcode-file-here (file output-buffer)
+  ""
+  (let* ((already-open (find-buffer-visiting file))
+		 (buffer (find-file-noselect file))
+		 (s-expr (jsel:read-buffer buffer)))
+	(with-current-buffer output-buffer
+	  (jsel:transcode (append (list 'program
+									`(comment ,(concat "Include: " file))) s-expr)))))
 
 (defun* jsel:transcode-current-buffer ()
   (interactive)

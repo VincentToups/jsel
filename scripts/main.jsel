@@ -1,0 +1,38 @@
+(defmacro incr (place)
+  `(setq ,place (+ 1 ,place)))
+
+(primitive-include "stdlib.jsel")
+
+(comment "document.addEventListener('DOMContentLoaded',function(){})")
+(require "jsel/functional"
+		 (lambda (functional)
+		   (document.add-event-listener 
+			"DOMContentLoaded" 
+			(lambda () (log "Simple ready works.")
+			  (def canvas (.: document get-element-by-id : "canvas"))
+			  (def context (.: canvas get-context : "2d"))
+			  (setq context.font "38pt Arial")
+			  (setq context.fill-style "cornflowerblue")
+			  (setq context.stroke-style "blue")
+			  (let ((x (- (/ canvas.width 2) 150))
+					(y (+ (/ canvas.height 2) 15)))
+				(.: context fill-text : 
+					"Hello Jsel"
+					x y)
+				(.: context stroke-text :
+					"Hello Jsel"
+					x y))
+
+			  (let ((x 0))
+				(incr x)
+				(log "x is: " x))))))
+
+
+
+
+
+
+
+
+
+
