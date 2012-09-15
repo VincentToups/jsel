@@ -1,5 +1,57 @@
 (require 'shadchen)
 
+(defun-match- jsel:update-alist (key value nil acc)
+  (reverse (cons (cons key value) acc)))
+
+(defun-match jsel:update-alist (key value
+									(list-rest (cons (equal key) old-value) rest)
+									acc)
+  (append (reverse (cons (cons key value) acc)) rest))
+
+(defun-match jsel:update-alist (key value
+									(list-rest (and wrong-cell 
+													(cons (not-equal key) old-value)) rest)
+									acc)
+  (recur key value rest (cons wrong-cell acc)))
+(defun-match jsel:update-alist (key value alist)
+  (recur key value alist nil))
+
+(defun-match- jsel:alist-has-key (key nil)
+  nil)
+(defun-match jsel:alist-has-key (key (list-rest (cons (equal key) value) tail))
+  t)
+(defun-match jsel:alist-has-key (key (list-rest (cons (not-equal key) value) tail))
+  (recur key tail))
+
+(defpattern jsel:alist-has-key (key pattern)
+  (let ((sym (gensym)))
+	`(p (lambda (,sym)
+		  (jsel:alist-has-key ,key ,sym))
+		,pattern)))
+
+
+(defpattern jsel:alist-without-key (key pattern)
+  (let ((sym (gensym)))
+	`(p (lambda (,sym)
+		  (not (jsel:alist-has-key ,key ,sym)))
+		,pattern)))
+
+(defun-match- jsel:alist-pages-update-or-add-to-top (key value (list) acc)
+  (reverse (cons (list (cons key value)) acc)))
+(defun-match jsel:alist-pages-update-or-add-to-top
+  (key value (list-rest (jsel:alist-has-key key alist) rest) acc)
+  (let ((new-alist (jsel:update-alist key value alist)))
+	(append (reverse acc) (cons new-alist rest))))
+(defun-match jsel:alist-pages-update-or-add-to-top
+  (key value (list (and top (jsel:alist-without-key key alist))) acc)
+  (reverse (cons (cons (cons key value) top) acc)))
+(defun-match jsel:alist-pages-update-or-add-to-top
+  (key value (list-rest (and not-it (jsel:alist-without-key key alist)) rest) acc)
+  (recur key value rest (cons not-it acc)))
+(defun-match jsel:alist-pages-update-or-add-to-top
+  (key value pages)
+  (jsel:alist-pages-update-or-add-to-top key value pages nil))
+
 (defun jsel:non-keyword-symbolp (x)
   "T when X is a symbol but not a keyword."
   (and (symbolp x)
@@ -77,8 +129,54 @@
 (defun-match jsel:transcode ('null (jsel:context-agnostic))
   (jsel:insert "null"))
 
+(defmacro jsel:let-if (c true-branch &optional false-branch)
+  (let ((n (gensym)))
+	`(let ((,n ,c))
+	   (if ,n ,true-branch ,false-branch))))
+
+(defvar jsel:*top-level-symbol-macros* (list))
+(defvar jsel:symbol-macro-contexts (list))
+(defun-match- jsel:get-symbol-macro (name nil)
+  nil)
+(defun-match jsel:get-symbol-macro (name (list-rest 
+										  (list) rest))
+  (recur name rest))
+(defun-match jsel:get-symbol-macro (name (list-rest 
+										  (list-rest (cons (equal name) macro-expander) tail)
+										  env))
+  macro-expander)
+(defun-match jsel:get-symbol-macro (name (list-rest 
+										  (list-rest (cons (not-equal name) macro-expander) tail)
+										  env))
+  (recur name (cons tail env)))
+
 (defun-match jsel:transcode ((p #'jsel:non-keyword-symbolp s) (or :statement :expression :either))
-  (jsel:insert (jsel:mangle s)))
+  (jsel:insert (let-if the-symbol-macro 
+					   (jsel:get-symbol-macro s)
+					   (funcall the-symbol-macro s) 
+					   (jsel:mangle s))))
+
+(defun-match- jsel:get-symbol-macro-cons-cell (name nil)
+  nil)
+(defun-match jsel:get-symbol-macro-cons-cell (name (list-rest 
+													(list) rest))
+  (recur name rest))
+(defun-match jsel:get-symbol-macro-cons-cell (name (list-rest 
+													(list-rest (and (cons (equal name) macro-expander)
+																	the-cell) tail)
+													env))
+  the-cell)
+(defun-match jsel:get-symbol-macro-cons-cell (name (list-rest 
+													(list-rest (cons (not-equal name) macro-expander) tail)
+													env))
+  (recur name (cons tail env)))
+
+(defun-match jsel:transcode ((p #'jsel:non-keyword-symbolp s) (or :statement :expression :either))
+  (jsel:insert (let-if the-symbol-macro 
+					   (jsel:get-symbol-macro s)
+					   (funcall the-symbol-macro s) 
+					   (jsel:mangle s))))
+
 
 (defun jsel:remove-colon-from-keyword (s)
   (let ((n (symbol-name s)))
@@ -96,8 +194,13 @@
 	(jsel:transcode-csvs elements)
 	(jsel:insert "]")))
 
+;;; VINCENT
+(defun-match jsel:transcode ((list-rest 'define-symbol-macro body)
+							 (jsel:context-agnostic))
+  )
+
 (defun-match jsel:transcode ((list 'var sym expr) (or :statement :either))
-  (jsel:insertf "var %s = " (jsel:mangle sym))
+  (jsel:insertf "var %s = " (jsel:transcode sym))
   (jsel:transcode expr))
 
 (defun-match jsel:transcode ((list 'var sym expr) :expression)
@@ -583,3 +686,4 @@
 	(jsel:transcode-file (buffer-file-name (current-buffer)))))
 
 (provide 'jsel)
+
