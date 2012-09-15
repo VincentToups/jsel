@@ -1,4 +1,5 @@
-(require 'shadchen)
+(eval-when (compile load eval) 
+  (require 'shadchen))
 
 (defun-match- jsel:update-alist (key value nil acc)
   (reverse (cons (cons key value) acc)))
@@ -28,6 +29,15 @@
 	`(p (lambda (,sym)
 		  (jsel:alist-has-key ,key ,sym))
 		,pattern)))
+
+(defun-match- jsel:alist-lookup (key nil or-value)
+  or-value)
+(defun-match jsel:alist-lookup (key (list-rest (cons (equal key) value) alist) or-value)
+  value)
+(defun-match jsel:alist-lookup (key (list-rest (cons (not-equal key) value) alist) or-value)
+  (recur key alist or-value))
+(defun-match jsel:alist-lookup (key alist)
+  (recur key alist nil))
 
 
 (defpattern jsel:alist-without-key (key pattern)
@@ -136,47 +146,39 @@
 
 (defvar jsel:*top-level-symbol-macros* (list))
 (defvar jsel:symbol-macro-contexts (list))
-(defun-match- jsel:get-symbol-macro (name nil)
-  nil)
-(defun-match jsel:get-symbol-macro (name (list-rest 
-										  (list) rest))
-  (recur name rest))
-(defun-match jsel:get-symbol-macro (name (list-rest 
-										  (list-rest (cons (equal name) macro-expander) tail)
-										  env))
-  macro-expander)
-(defun-match jsel:get-symbol-macro (name (list-rest 
-										  (list-rest (cons (not-equal name) macro-expander) tail)
-										  env))
-  (recur name (cons tail env)))
 
-(defun-match jsel:transcode ((p #'jsel:non-keyword-symbolp s) (or :statement :expression :either))
-  (jsel:insert (let-if the-symbol-macro 
+(defun-match- jsel:get-symbol-macro (s nil)
+  (jsel:alist-lookup s jsel:*top-level-symbol-macros*))
+(defun-match jsel:get-symbol-macro (s (list-rest env rest))
+  (let ((expander (jsel:alist-lookup s env)))
+	(if expander expander
+	  (recur s rest))))
+(defun-match jsel:get-symbol-macro (s)
+  (recur s jsel:symbol-macro-contexts))
+
+(eval-when (compile load eval) 
+  (defun jsel:symbol-macro-bind->alist-entry (bind)
+	(match bind 
+		   ((list (symbol s) expr)
+			`(,s . (lambda (,(gensym)) ,expr)))
+		   ((list (symbol s) (list (symbol id)) expr)
+			`(s . (lambda (,id) ,expr)))))
+  (defun-match- jsel:symbol-macro-binders->alist (nil acc)
+	acc)
+  (defun-match jsel:symbol-macro-binders->alist ((list-rest binder tl) acc)
+	(recur tl (cons (jsel:symbol-macro-bind->alist-entry binder) acc)))
+  (defun-match jsel:symbol-macro-binders->alist (binders)
+	(recur binders nil)))
+
+(defmacro jsel:with-symbol-macros (bindings &body body)
+  `(let ((jsel:symbol-macro-contexts (cons ',(jsel:symbol-macro-binders->alist bindings))))
+	 ,@body))
+
+(defun-match jsel:transcode ((p #'jsel:non-keyword-symbolp s) (and context (or :statement :expression :either)))
+  (let-if the-symbol-macro 
 					   (jsel:get-symbol-macro s)
-					   (funcall the-symbol-macro s) 
-					   (jsel:mangle s))))
-
-(defun-match- jsel:get-symbol-macro-cons-cell (name nil)
-  nil)
-(defun-match jsel:get-symbol-macro-cons-cell (name (list-rest 
-													(list) rest))
-  (recur name rest))
-(defun-match jsel:get-symbol-macro-cons-cell (name (list-rest 
-													(list-rest (and (cons (equal name) macro-expander)
-																	the-cell) tail)
-													env))
-  the-cell)
-(defun-match jsel:get-symbol-macro-cons-cell (name (list-rest 
-													(list-rest (cons (not-equal name) macro-expander) tail)
-													env))
-  (recur name (cons tail env)))
-
-(defun-match jsel:transcode ((p #'jsel:non-keyword-symbolp s) (or :statement :expression :either))
-  (jsel:insert (let-if the-symbol-macro 
-					   (jsel:get-symbol-macro s)
-					   (funcall the-symbol-macro s) 
-					   (jsel:mangle s))))
-
+					   (jsel:transcode (funcall the-symbol-macro s) context) 
+					   (jsel:insert (jsel:mangle s))))
 
 (defun jsel:remove-colon-from-keyword (s)
   (let ((n (symbol-name s)))
@@ -187,6 +189,12 @@
 
 (defun-match jsel:transcode (_)
   (jsel:transcode _ :either))
+
+(defun-match jsel:transcode ((list-rest 'symbol-macro-let bindings body)
+							 (jsel:context-agnostic))
+  (let ((jsel:symbol-macro-contexts 
+		 (cons (jsel:symbol-macro-binders->alist bindings) jsel:symbol-macro-contexts)))
+	(jsel:transcode `(let () ,@body))))
 
 (defun-match jsel:transcode ((p #'vectorp vector-expression) (jsel:context-agnostic))
   (let ((elements (coerce vector-expression 'list)))
