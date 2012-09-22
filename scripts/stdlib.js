@@ -1,7 +1,3 @@
-/*
-Include: stdlib.jsel
-*/
-;
 var primitiveminusplus = function(a, b) {
   return (a+b);
   };
@@ -15,14 +11,14 @@ var primitiveminustimes = function(a, b) {
   return (a*b);
   };
 var foldl = function(flessThanitampersandacgreaterThan, init, a) {
-  ((function(iteratableminus91363) {
-      for (index in iteratableminus91363)      {
+  ((function(iteratableminus128230) {
+      for (index in iteratableminus128230)      {
       ((function(index, element) {
               return (((function() {
                   init = ((flessThanitampersandacgreaterThan)(element, init));
           return (undefined);
           })()));
-        })(index, (iteratableminus91363)[index]));
+        })(index, (iteratableminus128230)[index]));
       };
     return (undefined);
     })(a));
@@ -38,30 +34,30 @@ var argumentsminusgreaterThanarray = function(anArguments) {
 var plus = function() {
   return ((foldl)(primitiveminusplus, 0, (argumentsminusgreaterThanarray)(arguments)));
   };
-var first = function(sharpQuoteArgminus91365) {
-  return ((sharpQuoteArgminus91365)[0]);
+var first = function(sharpQuoteArgminus128232) {
+  return ((sharpQuoteArgminus128232)[0]);
   };
-var second = function(sharpQuoteArgminus91366) {
-  return ((sharpQuoteArgminus91366)[1]);
+var second = function(sharpQuoteArgminus128233) {
+  return ((sharpQuoteArgminus128233)[1]);
   };
-var third = function(sharpQuoteArgminus91367) {
-  return ((sharpQuoteArgminus91367)[2]);
+var third = function(sharpQuoteArgminus128234) {
+  return ((sharpQuoteArgminus128234)[2]);
   };
-var fourth = function(sharpQuoteArgminus91368) {
-  return ((sharpQuoteArgminus91368)[3]);
+var fourth = function(sharpQuoteArgminus128235) {
+  return ((sharpQuoteArgminus128235)[3]);
   };
-var fifth = function(sharpQuoteArgminus91369) {
-  return ((sharpQuoteArgminus91369)[4]);
+var fifth = function(sharpQuoteArgminus128236) {
+  return ((sharpQuoteArgminus128236)[4]);
   };
-var sixth = function(sharpQuoteArgminus91370) {
-  return ((sharpQuoteArgminus91370)[5]);
+var sixth = function(sharpQuoteArgminus128237) {
+  return ((sharpQuoteArgminus128237)[5]);
   };
-var seventh = function(sharpQuoteArgminus91371) {
-  return ((sharpQuoteArgminus91371)[6]);
+var seventh = function(sharpQuoteArgminus128238) {
+  return ((sharpQuoteArgminus128238)[6]);
   };
 var nth = function(n, a) {
-  return ((function(sharpQuoteArgminus91373) {
-      return ((sharpQuoteArgminus91373)[n]);
+  return ((function(sharpQuoteArgminus128240) {
+      return ((sharpQuoteArgminus128240)[n]);
     })(a));
   };
 var rest = function(a) {
@@ -101,48 +97,39 @@ var primitiveminusequalequalequal = function(a, b) {
   return (a===b);
   };
 var log = function() {
-  return (((function(iteratableminus91374) {
-      for (index in iteratableminus91374)      {
+  return (((function(iteratableminus128241) {
+      for (index in iteratableminus128241)      {
       ((function(index, element) {
               return (((console).log)(element));
-        })(index, (iteratableminus91374)[index]));
+        })(index, (iteratableminus128241)[index]));
       };
     return (undefined);
     })((argumentsminusgreaterThanarray)(arguments))));
   };
-;
-/*
-document.addEventListener('DOMContentLoaded',function(){})
-*/
-;
-(log)("At least here.");
-(require)(["jsel/test-module"], function(tm) {
+((function(testVariable) {
   return (((function() {
-      (log)("Simple ready works.");
-    var canvas = ((document).getElementById)("canvas");
-    var context = ((canvas).getContext)("2d");
-    ((function() {
-          (context).font = ("38pt Arial");
-      return (undefined);
-      })());
-    ((function() {
-          (context).fillStyle = ("cornflowerblue");
-      return (undefined);
-      })());
-    ((function() {
-          (context).strokeStyle = ("blue");
-      return (undefined);
-      })());
-    ((function(x, y) {
-          ((context).fillText)("Hello Jsel", x, y);
-      return (((context).strokeText)("Hello Jsel", x, y));
-      })((minus)((divide)((canvas).width, 2), 150), (plus)((divide)((canvas).height, 2), 15)));
-    return (((function(x) {
-          ((function() {
-              x = ((plus)(x, 1));
-        return (undefined);
-        })());
-      return ((log)("x is: ", x));
-      })(0)));
+      ((stdlib).incr)(testVariable);
+    ((stdlib).incr)(testVariable);
+    ((stdlib).incr)(testVariable);
+    return (testVariable);
     })()));
-  });
+  })(0));
+var testModule = ((function(primitiveModuleD7421bf4cdc04a8200155c2dac670ade) {
+  var (primitiveModuleD7421bf4cdc04a8200155c2dac670ade).x = 10;
+  var (primitiveModuleD7421bf4cdc04a8200155c2dac670ade).+x = function(y) {
+      return ((plus)(y, x));
+    };
+  ;
+  return (primitiveModuleD7421bf4cdc04a8200155c2dac670ade);
+  })({}));
+((function(x) {
+  ((function() {
+      x = ((minus)(x, 1));
+    return (undefined);
+    })());
+  ((function() {
+      x = ((minus)(x, 1));
+    return (undefined);
+    })());
+  return (x);
+  })(10));

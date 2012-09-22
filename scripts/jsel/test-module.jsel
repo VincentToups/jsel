@@ -1,0 +1,5 @@
+(rjs-module 
+ ()
+ (def-external x 10)
+ (defmacro-external incr (where)
+   `(setq ,where (+ ,where 1))))

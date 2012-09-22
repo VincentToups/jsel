@@ -11,14 +11,14 @@ var plusPrimitive = function(a, b) {
   };
 var plus = function() {
   return (((function(result, argArray) {
-      ((function(iteratableminus73856) {
-          for (index in iteratableminus73856)        {
+      ((function(iteratableminus100351) {
+          for (index in iteratableminus100351)        {
         ((function(index, element) {
                   return (((function() {
                       result = ((plusPrimitive)(result, element));
             return (undefined);
             })()));
-          })(index, (iteratableminus73856)[index]));
+          })(index, (iteratableminus100351)[index]));
         };
       return (undefined);
       })(argArray));
@@ -34,16 +34,40 @@ var z = ((function(x) {
   return (x);
   })(10));
 var r = ((function(a, o) {
-  ((function(iteratableminus73857) {
-      for (index in iteratableminus73857)      {
+  ((function(iteratableminus100352) {
+      for (index in iteratableminus100352)      {
       ((function(index, element) {
               return (((function() {
                   o = ((plusPrimitive)(o, element));
           return (undefined);
           })()));
-        })(index, (iteratableminus73857)[index]));
+        })(index, (iteratableminus100352)[index]));
       };
     return (undefined);
     })(a));
   return (o);
   })([1, 2, 3, 4], 0));
+var testModule = ((function(primitiveModuleminus03c04fdb2f409ff278723c3efcd378b4) {
+  var primitiveModuleminus03c04fdb2f409ff278723c3efcd378b4.a = 10;
+  var primitiveModuleminus03c04fdb2f409ff278723c3efcd378b4.b = 10;
+  var primitiveModuleminus03c04fdb2f409ff278723c3efcd378b4.plusb = function(x) {
+      return ((plus)(x, primitiveModuleminus03c04fdb2f409ff278723c3efcd378b4.b));
+    };
+  //(defmacro primitive-module-03c04fdb2f409ff278723c3efcd378b4\.progn (&body body) (\` (let nil (\,@ body))));
+  return (primitiveModuleminus03c04fdb2f409ff278723c3efcd378b4);
+  })(((function(object100354) {
+  return (object100354);
+  })({}))));
+;
+(testModule.plusb)(100);
+((function() {
+  (console.log)("Hello Nurse!");
+  (hello)();
+  return ((nurse)());
+  })());
+((function() {
+  return ((console.log)("Hello Nurse!"));
+  })());
+((function() {
+  return ((console.log)("HN2"));
+  })());

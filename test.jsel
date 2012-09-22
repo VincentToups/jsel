@@ -29,3 +29,20 @@
 			  (setq o (+-primitive o element)))
 		 o))
 
+(def-primitive-module test-module 
+  (def-external a 10)
+  (def-external b 10)
+  (def-external (+b x)
+	(+ x b))
+  (defmacro-external progn (&body body)
+	`(let () 
+	   ,@body)))
+
+(defmacro progn2 (&body body)
+  `(let () ,@body))
+
+(test-module.+b 100)
+(test-module.progn (console.log "Hello Nurse!") (hello) (nurse))
+(progn2 (console.log "Hello Nurse!"))
+
+(let () (console.log "HN2"))

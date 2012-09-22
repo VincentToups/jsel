@@ -16,11 +16,11 @@
 	 init)
 
 (def (arguments->array an-arguments)
-	((.. [] slice apply) an-arguments))
+	 ((.. [] slice apply) an-arguments))
 
 (comment "+ takes any number of arguments.")
 (def (+ )
-	(foldl primitive-+ 0 (arguments->array arguments)))
+	 (foldl primitive-+ 0 (arguments->array arguments)))
 
 (def first #'0)
 (def second #'1)
@@ -30,35 +30,40 @@
 (def sixth #'5)
 (def seventh #'6)
 (def (nth n a)
-	(#'n a))
+	 (#'n a))
 
 (def (rest a)
-	(a.slice 1))
+	 (a.slice 1))
 
 (comment "- takes any number of arguments")
 (def (- )
-	(let ((args-array (arguments->array arguments))) 
-	  (primitive-- (first args-array)
-				   (foldl primitive-+ 0
-						  (rest args-array)))))
+	 (let ((args-array (arguments->array arguments))) 
+	   (primitive-- (first args-array)
+					(foldl primitive-+ 0
+						   (rest args-array)))))
 
 (comment "* takes any number of arguments.")
 (def (* )
-	(foldl primitive-* 1 (arguments->array arguments)))
+	 (foldl primitive-* 1 (arguments->array arguments)))
 
 (comment "simple-apply takes a function and an array.")
 (def (simple-apply f a)
-	(f.apply f a))
+	 (f.apply f a))
 
 (comment "/ takes any number of arguments")
 (def (/ )
-	(primitive-/ (first arguments)
-				 (foldl primitive-* 1
-						(rest (arguments->array arguments)))))
+	 (primitive-/ (first arguments)
+				  (foldl primitive-* 1
+						 (rest (arguments->array arguments)))))
 
 (def (primitive-=== a b)
-	(literally "a===b"))
+	 (literally "a===b"))
 
 (def (log )
-	(for ((index element) :in (arguments->array arguments))
-		 (console.log element)))
+	 (for ((index element) :in (arguments->array arguments))
+		  (console.log element)))
+
+
+
+
+

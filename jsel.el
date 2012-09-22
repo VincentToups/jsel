@@ -1,6 +1,60 @@
 (eval-when (compile load eval) 
   (require 'shadchen))
 
+(defmacro jsel:defvar-force-init (name value &optional doc)
+  `(progn (defvar ,name nil ,doc)
+		  (setq ,name ,value)))
+
+(eval-when (compile load eval) 
+  (defun jsel:symbol->reduced-form (s)
+	(let ((name (symbol-name s)))
+	  (match name 
+			 ("." (intern "."))
+			 (".." (intern ".."))
+			 (".:" (intern ".:"))
+			 ("..*" (intern "..*"))
+			 (name 
+			  (let ((pieces (split-string name (regexp-quote "."))))
+				(match pieces
+					   ((list one-piece) s)
+					   ((list-rest (funcall #'intern head) other-pieces)
+						`(.. ,(jsel:transform-via-symbol-macro head)
+							 ,@(mapcar (lambda (s) `(literally ,(jsel:mangle s))) other-pieces)))))))))
+
+  (defun jsel:simple-symbol-p (s)
+	(and (symbolp s)
+		 (eq (jsel:symbol->reduced-form s) s)))
+
+  (defun jsel:symbol->reduced-form-or-pass (s)
+	(if (symbolp s)
+		(jsel:symbol->reduced-form s)
+	  s))
+
+  (defun-match- jsel:join (nil delim acc)
+	acc)
+  (defun-match jsel:join (elements delim)
+	(recur elements delim ""))
+  (defun-match jsel:join ((list hd) delim acc)
+	(concat acc hd))
+  (defun-match jsel:join ((list-rest hd tl) delim acc)
+	(recur tl delim (concat acc hd delim)))
+
+  (defun jsel:expression->reduced-form (e)
+	(match e
+		   ((symbol s)
+			(jsel:symbol->reduced-form s))
+		   ((list-rest (and leader '..) hd other-expressions)
+			`(,leader (jsel:symbol->reduced-form-or-pass hd) ,@other-expressions))
+		   (_ _)))
+
+  (defun-match- jsel:..->symbol-for-macro-lookup ((list-rest '.. hd symbols))
+	(if (not (symbolp hd))
+		(gensym)
+	  (intern (jsel:join (mapcar #'symbol-name (cons hd symbols)) "."))
+	  ))
+  (defun-match jsel:..->symbol-for-macro-lookup (_)
+	(gensym)))
+
 (defun-match- jsel:update-alist (key value nil acc)
   (reverse (cons (cons key value) acc)))
 
@@ -17,18 +71,24 @@
 (defun-match jsel:update-alist (key value alist)
   (recur key value alist nil))
 
-(defun-match- jsel:alist-has-key (key nil)
-  nil)
-(defun-match jsel:alist-has-key (key (list-rest (cons (equal key) value) tail))
-  t)
-(defun-match jsel:alist-has-key (key (list-rest (cons (not-equal key) value) tail))
-  (recur key tail))
+(eval-when (compile load eval) 
+  (defun-match- jsel:alist-has-key (key nil)
+	nil)
+  (defun-match jsel:alist-has-key (key (list-rest (cons (equal key) value) tail))
+	t)
+  (defun-match jsel:alist-has-key (key (list-rest (cons (not-equal key) value) tail))
+	(recur key tail))
 
-(defpattern jsel:alist-has-key (key pattern)
-  (let ((sym (gensym)))
-	`(p (lambda (,sym)
-		  (jsel:alist-has-key ,key ,sym))
-		,pattern)))
+  (defpattern jsel:alist-has-key (key pattern)
+	(let ((sym (gensym)))
+	  `(p (lambda (,sym)
+			(jsel:alist-has-key ,key ,sym))
+		  ,pattern)))
+  (defpattern jsel:alist-without-key (key pattern)
+	(let ((sym (gensym)))
+	  `(p (lambda (,sym)
+			(not (jsel:alist-has-key ,key ,sym)))
+		  ,pattern))))
 
 (defun-match- jsel:alist-lookup (key nil or-value)
   or-value)
@@ -40,11 +100,6 @@
   (recur key alist nil))
 
 
-(defpattern jsel:alist-without-key (key pattern)
-  (let ((sym (gensym)))
-	`(p (lambda (,sym)
-		  (not (jsel:alist-has-key ,key ,sym)))
-		,pattern)))
 
 (defun-match- jsel:alist-pages-update-or-add-to-top (key value (list) acc)
   (reverse (cons (list (cons key value)) acc)))
@@ -88,7 +143,7 @@
 	  ("*" "times")
 	  ("<" "lessThan")
 	  (">" "greaterThan")
-	  ("$" "cash")
+	  ("$" "$")
 	  ("=" "equal")
 	  ("%" "modsign")
 	  ("!" "bang")
@@ -109,7 +164,7 @@
 (defun jsel:insert (fs)
   (insert fs))
 
-(defvar jsel:indent-depth 0)
+(jsel:defvar-force-init jsel:indent-depth 0)
 (defun jsel:newline ()
   (jsel:insertf "\n")
   (loop for i from 1 to jsel:indent-depth do
@@ -121,8 +176,9 @@
 		   (jsel:insert " "))
 	 ,@body))
 
-(defpattern jsel:context-agnostic ()
-  '(or :statement :expression :either))
+(eval-when (compile load eval) 
+  (defpattern jsel:context-agnostic ()
+	'(or :statement :expression :either)))
 
 (defun-match- jsel:transcode ('undefined (jsel:context-agnostic))
   (jsel:insert "undefined"))
@@ -144,8 +200,8 @@
 	`(let ((,n ,c))
 	   (if ,n ,true-branch ,false-branch))))
 
-(defvar jsel:*top-level-symbol-macros* (list))
-(defvar jsel:symbol-macro-contexts (list))
+(jsel:defvar-force-init jsel:*top-level-symbol-macros* (list))
+(jsel:defvar-force-init jsel:symbol-macro-contexts (list))
 
 (defun-match- jsel:get-symbol-macro (s nil)
   (jsel:alist-lookup s jsel:*top-level-symbol-macros*))
@@ -155,6 +211,20 @@
 	  (recur s rest))))
 (defun-match jsel:get-symbol-macro (s)
   (recur s jsel:symbol-macro-contexts))
+
+(defun jsel:transform-via-symbol-macro (s)
+  (let ((expander (jsel:get-symbol-macro s)))
+	(if expander (funcall expander s)
+	  s)))
+
+
+(defun-match- jsel:extend-current-symbol-macro-context (s transformer (list))
+  (setf jsel:*top-level-symbol-macros* (cons (cons s transformer) jsel:*top-level-symbol-macros*)))
+(defun-match jsel:extend-current-symbol-macro-context (s tranformer (list-rest context other-contexts))
+  (setf jsel:symbol-macro-contexts 
+		(cons (cons (cons s tranformer) context) other-contexts)))
+(defun-match jsel:extend-current-symbol-macro-context (s tranformer)
+  (recur s tranformer jsel:symbol-macro-contexts))
 
 (eval-when (compile load eval) 
   (defun jsel:symbol-macro-bind->alist-entry (bind)
@@ -174,11 +244,15 @@
   `(let ((jsel:symbol-macro-contexts (cons ',(jsel:symbol-macro-binders->alist bindings))))
 	 ,@body))
 
-(defun-match jsel:transcode ((p #'jsel:non-keyword-symbolp s) (and context (or :statement :expression :either)))
-  (let-if the-symbol-macro 
-					   (jsel:get-symbol-macro s)
-					   (jsel:transcode (funcall the-symbol-macro s) context) 
-					   (jsel:insert (jsel:mangle s))))
+(defun-match jsel:transcode ((p #'jsel:non-keyword-symbolp s) 
+							 (and context (or :statement :expression :either)))
+  (let ((s (jsel:symbol->reduced-form s))) 
+	(if (symbolp s) 
+		(let-if the-symbol-macro 
+				(jsel:get-symbol-macro s)
+				(jsel:transcode (funcall the-symbol-macro s) context) 
+				(jsel:insert (jsel:mangle s)))
+	  (jsel:transcode s context))))
 
 (defun jsel:remove-colon-from-keyword (s)
   (let ((n (symbol-name s)))
@@ -196,6 +270,17 @@
 		 (cons (jsel:symbol-macro-binders->alist bindings) jsel:symbol-macro-contexts)))
 	(jsel:transcode `(let () ,@body))))
 
+(defun-match jsel:transcode ((list-rest 'symbol-macro-letq bindings body)
+							 (jsel:context-agnostic))
+  (let ((jsel:symbol-macro-contexts 
+		 (cons (jsel:symbol-macro-binders->alist 
+				(mapcar (match-lambda 
+						 ((list s e)
+						  (list s `(quote ,e))))
+						bindings)) jsel:symbol-macro-contexts)))
+	(jsel:transcode `(let () ,@body))))
+
+
 (defun-match jsel:transcode ((p #'vectorp vector-expression) (jsel:context-agnostic))
   (let ((elements (coerce vector-expression 'list)))
 	(jsel:insert "[")
@@ -208,7 +293,10 @@
   )
 
 (defun-match jsel:transcode ((list 'var sym expr) (or :statement :either))
-  (jsel:insertf "var %s = " (jsel:transcode sym))
+  ;;(jsel:insertf "var %s = " (jsel:transcode sym))
+  (jsel:insert "var ")
+  (jsel:transcode sym)
+  (jsel:insert " = ")
   (jsel:transcode expr))
 
 (defun-match jsel:transcode ((list 'var sym expr) :expression)
@@ -521,8 +609,87 @@
 (defun-match jsel:transcode ((list-rest 'def (list-rest (p #'symbolp name) args) body) (jsel:context-agnostic))
   (jsel:transcode `(var ,name (lambda ,args ,@body))))
 
+(defun-match jsel:transcode ((list-rest 'def-fun-dont-symbol-macro-expand-id 
+										(list-rest (p #'symbolp name) args) body) (jsel:context-agnostic))
+  (jsel:insert "var ")
+  (jsel:insert (jsel:mangle name))
+  (jsel:insert " = ")
+  (jsel:transcode `(lambda (,@args) ,@body)))
+
 (defun-match jsel:transcode ((list-rest 'program body) (jsel:context-agnostic))
   (jsel:transcode-newline-sequence body))
+
+(defun-match jsel:transcode ((list 'primitive-try 
+								   (list-rest body-block)
+								   (list-rest 'catch (symbol s) catch-body)
+								   (list-rest 'finally finally-body))
+							 (jsel:context-agnostic))
+  (jsel:insert "try")
+  (jsel:transcode-block body-block)
+  (jsel:insert "catch (")
+  (jsel:transcode s)
+  (jsel:insert ")")
+  (jsel:transcode-block catch-body)
+  (jsel:insert "finally")
+  (jsel:transcode-block finally-body))
+
+(defun-match jsel:transcode ((list 'throw expression)
+							 (jsel:context-agnostic))
+  (jsel:insert "(throw ")
+  (jsel:transcode expression)
+  (jsel:insert ")"))
+
+(defun jsel:make-last-element-a-setq (target elements)
+  (let* ((r (reverse elements))
+		 (last (car r))
+		 (all-but-last (cdr r))
+		 (new-last `(setq ,target ,last)))
+	(reverse (cons new-last all-but-last))))
+
+(defun-match jsel:transcode ((list 'try (list-rest body-block)
+								   (list-rest 'catch (symbol binding) catch-block))
+							 (jsel:context-agnostic))
+  (let ((retval (gensym "try-retval")))
+	(recur `(let ((,retval undefined)) 
+			  (primitive-try ,(jsel:make-last-element-a-setq ,retval body-block)
+							 (catch ,binding ,@catch-block)
+							 (finally undefined)) 
+			  ,retval))))
+
+
+(defun-match jsel:transcode ((list 'try (list-rest body-block)
+								   (list-rest 'finally  finally-block))
+							 (jsel:context-agnostic))
+  (let ((retval (gensym "try-retval"))
+		(exception (gensym "exception-")))
+	(recur `(let ((,retval undefined)) 
+			  (primitive-try ,(jsel:make-last-element-a-setq retval body-block)
+							 (catch ,exception (throw ,exception))
+							 (finally ,@finally-block)) 
+			  ,retval))))
+
+(defun-match jsel:transcode ((list 'try (list-rest body-block)
+								   (list-rest 'catch (symbol binding) catch-block)
+								   (list-rest 'finally finally-block))
+							 (jsel:context-agnostic))
+  (let ((retval (gensym "try-retval")))
+	(recur `(let ((,retval undefined)) 
+			  (primitive-try ,(jsel:make-last-element-a-setq retval body-block)
+							 (catch ,binding ,@catch-block)
+							 (finally ,@finally-block)) 
+			  ,retval))))
+
+(defun-match jsel:transcode ((list 'try (list-rest body-block)
+								   (list-rest 'finally finally-block)
+								   (list-rest 'catch (symbol binding) catch-block))
+							 (jsel:context-agnostic))
+  (let ((retval (gensym "try-retval")))
+	(recur `(let ((,retval undefined)) 
+			  (primitive-try ,(jsel:make-last-element-a-setq retval body-block)
+							 (catch ,binding ,@catch-block)
+							 (finally ,@finally-block)) 
+			  ,retval))))
+
 
 (defun-match jsel:transcode ((list 'literally string)
 							 (jsel:context-agnostic))
@@ -533,26 +700,53 @@
   (loop for file in files do
 		(jsel:transcode-file-here file (current-buffer))))
 
-(defvar jsel:macros (make-hash-table :test 'equal))
+(jsel:defvar-force-init jsel:macros (make-hash-table :test 'equal))
+(setq jsel:macros (make-hash-table :test 'equal))
 (defun jsel:macro-symbolp (s)
-  (gethash s jsel:macros))
+  (if (symbolp s) 
+	  (gethash (jsel:transform-via-symbol-macro s) jsel:macros)
+	(gethash (jsel:transform-via-symbol-macro 
+			  (jsel:..->symbol-for-macro-lookup s)) jsel:macros)))
+
+(defun jsel:get-macro-expander (s)
+  (jsel:macro-symbolp s))
+
 
 (defun-match jsel:transcode ((list-rest 'defmacro name args body)
 							 (jsel:context-agnostic))
-  (let ((arg-name (gensym "macro-arg-names-")))
-	(puthash name
-			 (eval `(lambda (&rest ,arg-name) 
-					  (destructuring-bind ,args ,arg-name ,@body)))
-			 jsel:macros)))
+  (assert (jsel:simple-symbol-p name)
+		  ()
+		  "Macros cannot be bound to non-simple symbols (ie,
+		  symbols with . in them.)  Tried to bind to %S." name)
+  (cond 
+   (jsel:*module* 
+	(let ((actual-name (jsel:symbol-concat jsel:*module* (intern "-") name)))
+	  (jsel:transcode `(defmacro ,actual-name ,arguments ,@body))
+	  (jsel:insertf "//%S" `(defmacro ,actual-name ,arguments ,@body))
+	  (jsel:extend-current-symbol-macro-context name (eval `(lambda (s) ',actual-name)))))
+   (:otherwise 
+	(let ((arg-name (gensym "macro-arg-names-")))
+	  (puthash name
+			   (eval `(lambda (&rest ,arg-name) 
+						(destructuring-bind ,args ,arg-name ,@body)))
+			   jsel:macros)))))
+
+(defun jsel:transforms-via-symbol-macrop (s)
+  (not (eq (jsel:transform-via-symbol-macro s) s)))
+
+(defun-match jsel:transcode ((list-rest (p #'jsel:transforms-via-symbol-macrop s) arguments)
+							 (and context (jsel:context-agnostic)))
+  (recur `(,(jsel:transform-via-symbol-macro s) ,@arguments)
+		 context))
 
 (defun-match jsel:transcode ((list-rest (p #'jsel:macro-symbolp dispatch-key) arguments)
-							 (jsel:context-agnostic))
-  (jsel:transcode (apply (gethash dispatch-key jsel:macros) arguments)))
+							 (and context (jsel:context-agnostic)))
+  (recur (apply (jsel:get-macro-expander dispatch-key) arguments) context))
 
 (defmacro* jsel:defmacro (name arglist &body body)
   (let ((arg-name (gensym "defmacro-args-")))
-	`(puthash ',name (lambda (&rest ,arg-name)
-					   (destructuring-bind ,arglist ,arg-name ,@body))
+	`(puthash ',(jsel:symbol->reduced-form name) (lambda (&rest ,arg-name)
+												   (destructuring-bind ,arglist ,arg-name ,@body))
 			  jsel:macros)))
 
 (jsel:defmacro let* (bindings &body body)
@@ -637,6 +831,87 @@
 			 (lambda (,@module-variable-names)
 			   ,@body))))
 
+(jsel:defvar-force-init jsel:*module* nil)
+(jsel:defvar-force-init jsel:*module-manifest* :out-of-module)
+(jsel:defvar-force-init jsel:*module-hash* nil)
+(jsel:defvar-force-init jsel:last-manifest nil)
+
+(defun jsel:extend-module-manifest (module-level-name type meta)
+  (cond 
+   ((eq :out-of-module jsel:*module-manifest*) (error "Cannot extend a module manifest when there is not an active module."))
+   (:otherwise
+	(setf jsel:*module-manifest* (cons (cons module-level-name (list type meta)) jsel:*module-manifest*)))))
+
+(defun jsel:get-manifest-item (name manifest)
+  (jsel:alist-lookup name manifest))
+
+(defun-match jsel:transcode ((list-rest 'primitive-module body)
+							 (jsel:context-agnostic))
+  (let ((jsel:*module* (intern (concat "primitive-module-" (md5 (format "%S" body)))))
+		(jsel:symbol-macro-contexts (cons (list) jsel:symbol-macro-contexts))
+		(jsel:*module-manifest* nil))
+	(jsel:transcode `(let ((,jsel:*module* (literally "{}")))
+					   ,@body
+					   ,jsel:*module*)
+					:either)
+	(setq jsel:last-manifest jsel:*module-manifest*)
+	jsel:*module-manifest*))
+
+(defun jsel:symbol-concat (&rest args)
+  (intern (apply #'concat (mapcar #'symbol-name args))))
+
+(defun-match jsel:transcode ((list 'def-external (symbol name) expression)
+							 (jsel:context-agnostic))
+  (cond 
+   (jsel:*module*
+	(let ((actual-name (jsel:symbol-concat jsel:*module* (intern ".") name)))
+	  (jsel:extend-module-manifest name :js-value `((:module . ,jsel:*module*) (:object-type . :any)))
+	  (jsel:transcode `(setq ,actual-name ,expression) :either)
+	  (jsel:extend-current-symbol-macro-context name (eval `(lambda (s) ',actual-name)))))
+   (:otherwise (error "jsel:transcode def-external can only be used in a module context."))))
+
+(defun-match jsel:transcode ((list-rest 'def-external (list-rest (symbol name) arguments) body)
+							 (jsel:context-agnostic))
+  (cond 
+   (jsel:*module*
+	(let ((actual-name (jsel:symbol-concat jsel:*module* (intern ".") name)))
+	  (jsel:extend-module-manifest name :js-value `((:module . ,jsel:*module*) (:object-type . :function)))
+	  (jsel:extend-current-symbol-macro-context name (eval `(lambda (s) ',actual-name)))
+	  (jsel:transcode `(setq ,actual-name (lambda (,@arguments) ,@body)))))
+   (:otherwise (error "jsel:transcode def-external can only be used in a module context."))))
+
+(defun-match jsel:transcode ((list-rest 'defmacro-external (symbol name) arguments body)
+							 (jsel:context-agnostic))
+  (assert (jsel:simple-symbol-p name)
+		  ()
+		  "Macros cannot be bound to non-simple symbols (ie,
+		  symbols with . in them.)  Tried to bind to %S." name)
+  (cond 
+   (jsel:*module*
+	(let ((actual-name (jsel:symbol-concat jsel:*module* (intern "-") name))
+		  (args (gensym)))
+	  (jsel:extend-module-manifest name :macro `((:module . ,jsel:*module*) 
+												 (:object-type . :not-an-object)
+												 (:actual-name . ,actual-name)))
+	  (setf (gethash actual-name jsel:macros)
+			(eval `(lambda (&rest ,args) (destructuring-bind ,arguments ,args ,@body))))
+	  (jsel:extend-current-symbol-macro-context name (eval `(lambda (s) ',actual-name)))))
+   (:otherwise (error "jsel:transcode def-external can only be used in a module context."))))
+
+(defun-match jsel:transcode ((list-rest 'def-primitive-module name body)
+							 (jsel:context-agnostic))
+  (let ((manifest (jsel:transcode 
+				   `(def ,name (primitive-module ,@body)))))
+	(loop for item in manifest do
+		  (match item 
+				 ((list name :js-value meta) :pass)
+				 ((list macro-name :macro meta)
+				  (let ((actual-name (jsel:alist-lookup :actual-name meta)))
+					(jsel:extend-current-symbol-macro-context 
+					 (jsel:symbol-concat name (intern ".") macro-name)
+					 (eval `(lambda (s) ',actual-name)))
+					(message "actual-name %S" actual-name)))))))
+
 ;;; SHOULD BE LAST ;;;
 
 (defun-match jsel:transcode ((list-rest fun args) (jsel:context-agnostic))
@@ -692,6 +967,10 @@
   (with-current-buffer (current-buffer)
 	(save-buffer)
 	(jsel:transcode-file (buffer-file-name (current-buffer)))))
+(defun-match- jsel:macro-expand-1 ((list-rest (p #'jsel:macro-symbolp dispatch-key) arguments))
+  (apply (jsel:get-macro-expander dispatch-key) arguments))
+(defun-match jsel:macro-expand-1 (_)
+  _)
 
 (provide 'jsel)
 

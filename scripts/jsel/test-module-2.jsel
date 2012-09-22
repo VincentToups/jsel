@@ -1,0 +1,6 @@
+(rjs-module 
+ ((jsel/test-module :as $ :using (incr (x y))))
+ (def-external x (+ 10 y))
+ (incr x))
+
+
