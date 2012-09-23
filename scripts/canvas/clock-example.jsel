@@ -1,0 +1,27 @@
+(rjs-module
+ ((canvas/macros :using (save-excursion))
+  (macros/simple-macros :using (with-object)))
+ (defs 
+   canvas (.: document get-element-by-id : :canvas)
+   context (.: canvas get-context : :2d)
+   FONT_HEIGHT 15
+   MARGIN 30
+   HAND_TRUNCATION (/ canvas.height 2)
+   HOUR_HAND_TRUNCATION (/ canvas.height 10)
+   NUMERAL_SPACING 20
+   RADIUS (- (/ canvas.width 2) MARGIN)
+   HAND_RADIUS (+ RADIUS NUMERAL_SPACING))
+ (def (draw-circle)
+	  (with-object 
+	   context
+	   (begin-path)
+	   (arc (/ canvas.width 2) (/ canvas.height 2) 5 0 (* 2 MATH.PI) true)
+	   (stroke)))
+ (def (draw-numerals)
+	  (defs numerals [1 2 3 4 5 6 7 8 9 10 11 12]
+		angle 0
+		numeral-width 0)
+	  (numerals.for-each 
+	   (lambda (numeral)
+		 ()))))
+

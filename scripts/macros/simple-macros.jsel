@@ -1,0 +1,16 @@
+(rjs-module
+ ()
+ (defmacro-external with-object (object-expr &body body)
+   (let ((object (gensym "object")))
+	 `(let ((,object ,object-expr))
+		,@(loop for expr in body collect 
+				(match expr 
+					   ((list-rest (symbol method) args)
+						`((.. ,object ,method) ,@args))
+					   ((list-rest (list-rest method-chain) args)
+						`((.. ,object ,@method-chain) ,@args))
+					   (_ 
+						(error "WITH-OBJECT: malformed body
+						expression.  All expressions must be method
+						invokations with a single symbol as the car or
+						a list of symbols.  Malformed expression: %S." _))))))))

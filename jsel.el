@@ -323,6 +323,10 @@
   (jsel:newline)
   (recur rest))
 
+(defun-match jsel:transcode ((list-rest 'splice statements)
+							 (jsel:context-agnostic))
+  (jsel:transcode-newline-sequence statements))
+
 (defun jsel:transcode-block (statements)
   (jsel:with-tab+ 
    (jsel:insert "{")
@@ -605,6 +609,38 @@
 
 (defun-match jsel:transcode ((list 'def (p #'symbolp name) value) (jsel:context-agnostic))
   (jsel:transcode `(var ,name ,value)))
+
+(defun-match- jsel:group-by-two ((and pair (list a b)) acc)
+  (reverse (cons pair acc)))
+(defun-match jsel:group-by-two ((and pair (list a)) acc)
+  (error "Can't group a list with an odd number of elements by two."))
+(defun-match jsel:group-by-two ((list-rest a b rest) acc)
+  (recur rest (cons (list a b) acc)))
+(defun-match jsel:group-by-two ((list))
+  (list))
+(defun-match jsel:group-by-two (something)
+  (recur something nil))
+
+(defun-match jsel:transcode ((list-rest 'defs pairs)
+							 (and context (jsel:context-agnostic)))
+  (let* ((pairs (jsel:group-by-two pairs))
+		 (rpairs (reverse pairs))
+		 (last (car rpairs))
+		 (initial-pairs (reverse (cdr rpairs)))
+		 (first-pair (car initial-pairs))
+		 (inner-pairs (cdr initial-pairs)))
+	(jsel:transcode `(def ,@first-pair))
+	(jsel:insertf ",\n")
+	(jsel:with-tab+
+	 (loop for (b e) in inner-pairs do
+		   (jsel:transcode b)
+		   (jsel:insert " = ")
+		   (jsel:transcode e)
+		   (jsel:insertf ",\n"))
+	 (jsel:transcode (first last))
+	 (jsel:insert " = ")
+	 (jsel:transcode (second last))
+	 (jsel:insert ";"))))
 
 (defun-match jsel:transcode ((list-rest 'def (list-rest (p #'symbolp name) args) body) (jsel:context-agnostic))
   (jsel:transcode `(var ,name (lambda ,args ,@body))))

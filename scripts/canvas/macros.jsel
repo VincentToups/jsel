@@ -1,7 +1,10 @@
 (rjs-module
  ()
  (defmacro-external save-excursion (context &body body)
-   (let ((-context (gensym "context-"))
-		 (context-state (gensym "context-state-")))
-	 `(let ((,-context ,context)
-			(,context-state (.. ,-context )))))))
+   (let ((-context (gensym "context-")))
+	 `(let ((,-context ,context))
+		((.. ,-context save))
+		(try 
+		 ,body
+		 (finally 
+		  ((.. ,-context restore))))))))
