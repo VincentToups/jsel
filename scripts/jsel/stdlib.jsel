@@ -1,0 +1,3 @@
+(rjs-module
+ ()
+ (primitive-include "flat-stdlib.jsel"))

@@ -1,0 +1,13 @@
+(rjs-module 
+ ()
+ "Emacs Lisp compatibility for bootstrapping."
+ (primitive-include "")
+ (def-external pair (car cdr)
+   (setq this.car car)
+   (setq this.cdr cdr)
+   this)
+ (def-external cons (car cdr)
+   (new pair car cdr))
+ (def-external cdr (pair-or-array)
+   (cond 
+	()))))

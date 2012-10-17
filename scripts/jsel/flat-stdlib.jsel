@@ -1,0 +1,479 @@
+(defmacro def* (&rest args)
+  `(def-or-def-external ,@args))
+(defmacro defmacro* (&rest args)
+  `(defmacro-or-defmacro-external ,@args))
+
+(defmacro* define-test (name desc expr)
+  `(setq tests [',name] (object :name ',name
+								:description ,desc
+								:test-lambda
+								(lambda ()
+								  ,expr))))
+
+(defmacro* define-tests (&rest forms)
+  (match forms 
+		 ((list-rest (symbol group-name) forms)
+		  `(program 
+			,@(loop for form in forms collect
+					(match form 
+						   ((list (symbol sub-name)
+								  expression)
+							`(define-test 
+							   ,(jsel:symbol-concat 
+								 group-name '- sub-name)
+							   ""
+							   ,expression))
+						   ((list (symbol sub-name)
+								  (string doc)
+								  expr)
+							`(define-test 
+							   ,(jsel:symbol-concat
+								 group-name '- sub-name)
+							   ,doc
+							   ,expr))
+						   ))))))
+
+(def tests (object))
+(def (Test-Results successes failures)
+	 (log "Entering Test-Results")
+	 (setq this.successes successes)
+	 (setq this.failures failures)
+	 (setq this.to-string 
+		   (lambda ()
+			 (+ "Test-results: "
+				this.successes.length " successes, \n"
+				this.failures.length " failures, \n"
+				"names of failed tests: \n["
+				((.. (map1 #':name this.failures) join) ", ")
+				"]")))
+	 this)
+
+(def* *last-args* undefined)
+(def* (run-tests )
+  (setq *last-args* arguments)
+  (if (=== 0 arguments.length)
+	  (let ((successes [])
+			(failures []))
+		(log "0 case")
+		(for ((index element) :in tests)
+			 (if (([] element :test-lambda))
+				 ((.. successes push) element)
+			   ((.. failures push) element)))
+		(new Test-Results 
+			 successes
+			 failures))
+	(let ((successes [])
+		  (failures []))
+	  (log "arguments case")
+	  (for ((index element) :in arguments)
+		   (let ((test ([] tests element)))
+			 (if (undefined test)
+				 (throw (+ "Undefined test " index "."))
+			   (let ((result (funcall ([] test :test-lambda))))
+				 (if result
+					 ((.. successes push) test)
+				   ((.. failures push) test))))))
+	  (new Test-Results  
+		   successes
+		   failures))))
+
+(define-test this-test-fails-on-purpose 
+  "A test to test test failure."
+  (primitive-=== true false))
+
+(def* (left-fold f<it-ac> init a)
+  (for ((index element) :in a)
+	   (setq init (f<it-ac> element init)))
+  init)
+
+(def* (primitive-=== a b)
+  (literally "a===b"))
+
+(def* first #'0)
+(def* second #'1)
+(def* third #'2)
+(def* fourth #'3)
+(def* fifth #'4)
+
+(def* (log x)
+  (if (&& (not (undefined console))
+		  (not (undefined console.log)))
+	  (console.log x)
+	(if (not (undefined print))
+		(print x))))
+
+(def* (=== )
+  (let ((outside-arguments arguments)) 
+	(let* ((false-sigil :false-sigil-b19113bd3c014c13a056876994fce043)
+		   (result (left-fold 
+					(lambda (it ac)
+					  (cond 
+					   ((primitive-=== ac false-sigil) false-sigil)
+					   ((primitive-=== it ac) 
+						it)
+					   ((not (primitive-=== it ac)) false-sigil)))
+					(first outside-arguments)
+					(rest (arguments->array outside-arguments)))))
+	  (if (primitive-=== false-sigil result) false true))))
+
+(define-test ===-test1 
+  "Test that ===, which takes any number of arguments, is correct."
+  (primitive-=== true 
+				 (=== "a" "a")))
+
+(define-test ===-test2
+  "Test that ===, which takes any number of arguments, is correct."
+  (primitive-=== false 
+				 (=== "a" "b")))
+
+(define-test ===-test3
+  "Test that ===, which takes any number of arguments, is correct."
+  (primitive-=== true 
+				 (=== "a" "a" "a")))
+
+(define-test ===-test4
+  "Test that ===, which takes any number of arguments, is correct."
+  (primitive-=== true 
+				 (=== 5 5 5)))
+
+(define-test ===-test5
+  "Test that ===, which takes any number of arguments, is correct."
+  (primitive-=== false
+				 (=== 5 5 4)))
+
+
+(def* (map1 f an-array)
+  (let ((output []))
+	(for ((index element) :in an-array)
+		 ((.. output push)
+		  (f element)))
+	output))
+
+
+(def* (+ )
+  (var total ([] arguments 0))
+  (for ((i el) :in (rest (arguments->array arguments)))
+	   (setq total (literally "total+el")))
+  total)
+
+(define-tests +
+  (binary 
+   "Test two argument addition."
+   (=== 4 (+ 2 2)))
+  (trinary 
+   "Test three argument addition."   
+   (=== 6 (+ 2 2 2)))
+  (strings 
+   "Test plus for strings."
+   (=== "abcdef" (+ "abc" "def"))))
+
+
+(def* (> a b)
+  (literally "a>b"))
+(def* (>= a b)
+  (literally "a>=b"))
+(def* (< a b)
+  (literally "a<b"))
+(def* (<= a b)
+  (literally "a<=b"))
+(def* (% a b)
+  (literally "a%b"))
+(def* (- )
+  (if (> arguments.length 1) 
+	  (let ((value ([] arguments 0))) 
+		(for ((i el) :in arguments)
+			 (if (> i 0) 
+				 (setq value (literally "value-el"))))
+		value)
+	(let ((value ([] arguments 0)))
+	  (literally "-value"))))
+
+(define-tests -
+  (negation (=== -1 (- 1)))
+  (binary (=== -1 (- 0 1)))
+  (trinary (=== 0 (- 3 2 1))))
+
+(def* (not v)
+  (literally "!v"))
+
+(def* (* )
+  (var value 1)
+  (for ((i el) :in arguments)
+	   (setq value (literally "el*value")))
+  value)
+
+(define-tests *
+  (binary (=== 4 (* 2 2)))
+  (trinary (=== (* 2 2 2) 8)))
+
+(def* (rest an-array)
+  (an-array.slice 1))
+
+(def* (arguments->array an-arguments)
+  ((.. [] slice apply) an-arguments))
+
+(def* (simple-apply f an-array)
+  (f.apply f an-array))
+
+(def* (/ )
+  (var numerator ([] arguments 0))
+  (var denominator
+	   (simple-apply * (rest (arguments->array arguments))))
+  (literally "numerator/denominator"))
+
+(define-tests /
+  (binary (=== (/ 4 2) 2))
+  (trinary (=== (/ 10.0 2 1) 5.0)))
+
+(def* (function-and )
+  (if (primitive-=== 0 arguments.length)
+	  true
+	(if (not (([] arguments 0)))
+		false
+	  (simple-apply function-and (rest (arguments->array arguments))))))
+
+(defmacro* and (&rest arguments)
+  `(function-and ,@(loop for argument in arguments collect
+						 `(lambda () ,argument))))
+
+(define-tests and
+  (argument-evaluation 
+   (let ((a 0))
+	 (and false (setq a 10))
+	 (=== a 0))))
+
+(def* (function-or )
+  (cond 
+   ((=== 0 arguments.length)
+	(throw "Or cannot be invoked with zero arguments."))
+   ((=== 1 arguments.length)
+	(if (([] argument 0))
+		true
+	  false))
+   (:otherwise 
+	(if (([] arguments 0))
+		true
+	  (simple-	apply function-or (rest (arguments->array arguments)))))))
+
+(defmacro* or (&rest arguments)
+  `(function-or ,@(loop for argument in arguments collect
+						`(lambda () ,argument))))
+
+(define-tests or
+  (argument-evaluation
+   (let ((a 0))
+	 (or true (setq a 10))
+	 (=== a 0))))
+
+(comment "Some macros.")
+
+(defmacro* incr (where)
+  `(setq ,where (+ 1 ,where)))
+
+(defmacro* decr (where)
+  `(setq ,where (- ,where 1)))
+
+(def* (plus-1 a)
+  (incr a)
+  a)
+
+(def* (minus-1 a)
+  (decr a)
+  a)
+
+(define-test trivial-test
+  "A totally trivial test." 
+  (=== true true))
+
+(def* (number? o)
+  (=== "number" (typeof o)))
+
+
+(define-tests number?
+  (is-number (=== true (number? 10)))
+  (is-not-number (=== false (number? "10"))))
+
+(def* (array? o)
+  (=== (Object.prototype.to-string.call o) "[object Array]"))
+
+(define-tests array?
+  (is-array (=== true (array? [])))
+  (is-not-array (=== false (array? 10))))
+
+(def* (json-equal a b)
+  (=== (JSON.stringify a)
+	   (JSON.stringify b)))
+
+(define-tests json-equal
+  (true-case (=== true (json-equal [1 2 3] [1 2 3])))
+  (false-case (=== false (json-equal "[1 2 3]" [1 2 3]))))
+
+(defmacro dont-do (&body body)
+  `(comment "didn't do"))
+
+(def* *match-fail* (object))
+(def recur-value-stack [])
+(def (recur-value)
+	 (first recur-value-stack))
+
+(def* (array)
+  (arguments->array arguments))
+
+(def* (prefix element an-array)
+  (.. [element] (concat an-array)))
+
+(def (to-string* o)
+	 (if (undefined JSON)
+		 (o.to-string)
+	   (JSON.stringify o)))
+
+(def (Recur-Handle key-value arguments)
+	 (setq this.key-value key-value)
+	 (setq this.arguments arguments)
+	 (setq this.to-string 
+		   (lambda ()
+			 (+ "Recur-Handle " 
+				((map1 to-string* this.arguments)
+				 (join " ")))))
+  this)
+
+(defmacro* recur-point (&body body)
+  `(let ((recur 
+		  (lambda ()
+			(prefix (recur-value) 
+					(arguments->array arguments)))))
+	 (try 
+	  (((.. recur-value-stack push) (create))
+	   ,@body)
+	  (finally
+	   ((.. recur-value-stack pop))))))
+
+(defmacro* match (value-expr &body clauses)
+  (match clauses
+		 ((list) `(throw "No successful matches for " 
+						 (if (undefined JSON) ,value-expr
+						   (JSON.stringify ,value-expr))))
+		 ((list-rest 
+		   (list-rest pattern body)
+		   subsequents)
+		  (jsel:with-gensyms 
+		   (value result)
+		   `(let* ((,value ,value-expr)
+				   (,result (match1 ,pattern ,value ,@body)))
+			  (if (primitive-=== *match-fail* ,result)
+				  (match ,value ,@subsequents)
+				,result))))))
+
+(defmacro apply-recur (f-expr &rest arguments-expr)
+  (jsel:with-gensyms 
+   (f result done aarguments)
+   `(let ((,f ,f-expr)
+		  (,done false)
+		  (,result null)
+		  (,arguments ,arguments-expr))
+	  (while (not ,done)
+		(setq ,result (apply )))))
+
+(defmacro match-lambda (&body clauses)
+  (jsel:with-gensyms (value)
+					 `(lambda (,value)
+						(match ,value ,@clauses))))
+
+(defmacro* match1 (match-expr value-expr &body body)
+  (match match-expr
+		 ((non-kw-symbol s)
+		  `(let ((,s ,value-expr))
+			 ,@body))
+		 ((keyword k)
+		  (let ((value (gensym "value")))
+			`(let ((,value ,value-expr))
+			   (if (=== ,value ,k)
+				   (progn  ,@body)
+				 *match-fail*))))
+		 ((number n)
+		  (let ((value (gensym "value")))
+			`(let ((,value ,value-expr))
+			   (if (=== ,value ,n)
+				   (progn  ,@body)
+				 *match-fail*))))
+		 ((string n)
+		  (let ((value (gensym "value")))
+			`(let ((,value ,value-expr))
+			   (if (=== ,value ,n)
+				   (progn  ,@body)
+				 *match-fail*))))
+		 ((list 'array+)
+		  (let ((value (gensym "value")))
+			`(let ((,value ,value-expr))
+			   (if (and (array? ,value)
+						(=== 0 (.. ,value length)))
+				   (progn ,@body)
+				 *match-fail*))))
+		 ((list 'array+ tail-pattern)
+		  (let ((value (gensym "value")))
+			`(let ((,value ,value-expr))
+			   (if (array? ,value)
+				   (match1 ,tail-pattern ,value ,@body)
+				 *match-fail*))))
+		 ((list-rest 'array+ p1 ps)
+		  (let ((value (gensym "value"))
+				(hd (gensym "hd-"))
+				(tl (gensym "tl-")))
+			`(let ((,value ,value-expr))
+			   (if (and (array? ,value)
+						(> (.. ,value length)
+						   0))
+				   (let ((,hd (first ,value))
+						 (,tl (rest ,value)))
+					 (match1 ,p1 ,hd
+							 (match1 (array+ ,@ps) ,tl ,@body)))))))
+		 ((list 'array)
+		  (let ((value (gensym "value")))
+			`(let ((,value ,value-expr))
+			   (if (and (array? ,value)
+						(=== 0 (.. ,value length)))
+				   (progn ,@body)
+				 *match-fail*))))
+		 ((list-rest 'array p1 ps)
+		  (let ((value (gensym "value"))
+				(hd (gensym "hd-"))
+				(tl (gensym "tl-")))
+			`(let ((,value ,value-expr))
+			   (if (and (array? ,value)
+						(> (.. ,value length)
+						   0))
+				   (let ((,hd (first ,value))
+						 (,tl (rest ,value)))
+					 (match1 ,p1 ,hd
+							 (match1 (array ,@ps) ,tl ,@body)))))))
+		 ((list 'object)
+		  `(progn ,@body))
+		 ((list-rest 'object key-expr pattern subsequents)
+		  (jsel:with-gensyms 
+		   (the-object key-value ref-value)
+		   `(let* ((,the-object ,value-expr)
+				   (,key-value ,key-expr)
+				   (,ref-value ([] ,the-object ,key-value)))
+			  (match1 ,pattern ,ref-value 
+					  (match1 (object ,@subsequents) ,the-object
+							  ,@body)))))))
+
+(define-tests match1
+  (array (=== 6 (match1 (array x y z) [1 2 3] (+ x y z))))
+  (literal-number 
+   (=== :matched (match1 10 10 :matched)))
+  (literal-string
+   (=== :matched (match1 "x" "x" :matched)))
+  (array+ 
+   (json-equal [1 2 3]
+			   (match1 (array+ a tail) [0 1 2 3] tail)))
+  (object-match1 
+   (=== :match 
+		(match1 (object :x 20) (object :x 20) :match)))
+  (object-match2 
+   (=== *match-fail*
+		(match1 (object :x 20) (object :x 30) :match))))
+
+
+
+(log (run-tests))

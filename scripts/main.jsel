@@ -3,7 +3,8 @@
 (comment "document.addEventListener('DOMContentLoaded',function(){})")
 (log "At least here.")
 (rjs-require
- ((jsel/test-module :as tm :using (incr)))
+ ((jsel/test-module :as tm :using (incr))
+  (jsel/stdlib :using :all))
  (log "Simple ready works.")
  (def canvas (.: document get-element-by-id : "canvas"))
  (def context (.: canvas get-context : "2d"))
@@ -18,6 +19,7 @@
    (.: context stroke-text :
 	   "Hello Jsel"
 	   x y))
+ (log "test mod: " (% 10 4))
 
  (let ((x 0))
    (incr x)

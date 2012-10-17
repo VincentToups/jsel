@@ -8,5 +8,9 @@
 	  (cons (jsel:pwd) load-path))
 
 (require 'jsel)
+(require 'require-js-type-modules)
 (require 'jsel-mode)
+
+
+
 

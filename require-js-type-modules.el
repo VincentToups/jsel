@@ -1,4 +1,5 @@
 (require 'jsel)
+(provide 'require-js-type-modules)
 
 (eval-when (compile load eval) 
   (require 'shadchen))
@@ -68,40 +69,40 @@
 (defun jsel:require-form->local-name (require-form)
   (match require-form 
 		 ((or (symbol it)
-			  (list it :using (list-rest _)))
+			  (list it :using (p #'jsel:valid-using-form-p _)))
 		  it)
 		 ((list mod-id :as (symbol local-name))
 		  local-name)
-		 ((list mod-id :using (list-rest _) :as (symbol local-name))
+		 ((list mod-id :using (p #'jsel:valid-using-form-p _) :as (symbol local-name))
 		  local-name)
-		 ((list mod-id :as (symbol local-name) :using (list-rest _))
+		 ((list mod-id :as (symbol local-name) :using (p #'jsel:valid-using-form-p _))
 		  local-name)
 		 (_ (error "Malformed rjs-module require form: %S." require-form))))
 
 (defun jsel:require-form-has-local-name-p (require-form)
   (match require-form 
 		 ((or (symbol it)
-			  (list mod-if :using (list-rest _))) 
+			  (list mod-if :using (p #'jsel:valid-using-form-p _))) 
 		  nil)
 		 ((list mod-id :as (symbol local-name))
 		  local-name)
-		 ((list mod-id :using (list-rest _) :as (symbol local-name))
+		 ((list mod-id :using (p #'jsel:valid-using-form-p _) :as (symbol local-name))
 		  local-name)
-		 ((list mod-id :as (symbol local-name) :using (list-rest _))
+		 ((list mod-id :as (symbol local-name) :using (p #'jsel:valid-using-form-p _))
 		  local-name)
 		 (_ (error "Malformed rjs-module require form: %S." require-form))))
 
 (defun jsel:require-form->using-symbols (require-form)
   (match require-form 
 		 ((symbol it) nil)
-		 ((list mod-id :using (list-rest symbols))
-		  symbols)
+		 ((list mod-id :using (p #'jsel:valid-using-form-p form))
+		  form)
 		 ((list mod-id :as (symbol local-name))
 		  nil)
-		 ((list mod-id :using (list-rest symbols) :as (symbol local-name))
-		  symbols)
-		 ((list mod-id :as (symbol local-name) :using (list-rest symbols))
-		  symbols)
+		 ((list mod-id :using (p #'jsel:valid-using-form-p form) :as (symbol local-name))
+		  form)
+		 ((list mod-id :as (symbol local-name) :using (p #'jsel:valid-using-form-p form))
+		  form)
 		 (_ (error "Malformed rjs-module require form: %S." require-form))))
 
 (defun jsel:manifest->name-list (manifest)
@@ -150,26 +151,97 @@
 
 
 (defun jsel:check-require-uses-exported-symbols (req-form manifest)
-  (match (jsel:all-a-in-b (mapcar #'jsel:using-name-part (jsel:require-form->using-symbols req-form))
-						  (jsel:manifest->name-list manifest))
-		 ((equal t) t)
-		 ((list 'fail on)
-		  (error "While compiling module `%S` tried to use symbol
+  (let* ((using-form (jsel:require-form->using-symbols req-form))
+		 (expanded-using-form (jsel:expand-using-form-with-manifest using-form manifest)))
+	(match (jsel:all-a-in-b (mapcar #'jsel:using-name-part expanded-using-form)
+							(jsel:manifest->name-list manifest))
+		   ((equal t) t)
+		   ((list 'fail on)
+			(error "While compiling module `%S` tried to use symbol
 		  `%S` which is not exported by module `%S`."
-				 jsel:*rjs-module*
-				 on
-				 (jsel:require-form->module-id req-form)))))
+				   jsel:*rjs-module*
+				   on
+				   (jsel:require-form->module-id req-form))))))
 
+ 
 (defun jsel:get-actual-name (alist)
   (jsel:alist-lookup :actual-name alist))
 
+(defun-match- jsel:list-of-symbols-p (nil)
+  t)
+(defun-match jsel:list-of-symbols-p ((list-rest (non-kw-symbol _) rest))
+  (recur rest))
+(defun-match jsel:list-of-symbols-p ((list-rest _ rest))
+  nil)
+
+(defun jsel:using-fragment-p (o)
+  (match o
+		 ((non-kw-symbol o) t)
+		 ((list (non-kw-symbol n1)
+				(non-kw-symbol n2))
+		  t)
+		 (_ nil)))
+
+(defun-match- jsel:list-of-using-fragments-p (nil)
+  t)
+(defun-match jsel:list-of-using-fragments-p 
+  ((list-rest (p #'jsel:using-fragment-p hd) tail))
+  (recur tail))
+(defun-match jsel:list-of-using-fragments-p ((list-rest _ rest))
+  nil)
+
+(defun jsel:valid-using-form-p (o)
+  (match 
+   o
+   (:all t)
+   ((list-rest :all-but (p #'jsel:list-of-symbols-p _))
+	t)
+   ((list-rest (p #'jsel:list-of-using-fragments-p _))
+	t)))
+
+(defun-match- jsel:filter (f nil acc)
+  (reverse acc))
+(defun-match jsel:filter (f (list-rest hd tl) acc)
+  (if (funcall f hd)
+	  (recur f tl (cons hd acc))
+	(recur f tl acc)))
+(defun-match jsel:filter (f (list-rest list))
+  (recur f list nil))
+
+(defun-match- jsel:set-diff ((list-rest a) nil by)
+  a)
+
+(defun-match jsel:set-diff ((list-rest a) (list-rest element-of-b tl-b) by)
+  (recur 
+   (jsel:filter 
+	(lambda (element-of-a)
+	  (not (funcall by element-of-a element-of-b)))
+	a)
+   tl-b
+   by))
+(defun-match jsel:set-diff ((list-rest set-a)
+							(list-rest set-b))
+  (recur set-a set-b #'equal))
+
+
+(defun jsel:expand-using-form-with-manifest (form manifest)
+  (match form 
+		 (:all (jsel:manifest->name-list manifest))
+		 ((list-rest :all-but symbols)
+		  (jsel:set-diff (jsel:manifest->name-list manifest) symbols))
+		 ((list-rest (p #'jsel:list-of-symbols-p regular-using-symbols))
+		  regular-using-symbols)))
+
 (defun jsel:collect-static-bindings (req-form manifest)
-  (let ((using-form (jsel:require-form->using-symbols
-					 req-form))
-		(local-name (jsel:require-form->local-name 
-					 req-form))
-		(mod-id (jsel:require-form->module-id 
-				 req-form))) 
+  (let* ((using-form (jsel:require-form->using-symbols
+					  req-form))
+		 (using-form 
+		  (jsel:expand-using-form-with-manifest 
+		   using-form manifest))
+		 (local-name (jsel:require-form->local-name 
+					  req-form))
+		 (mod-id (jsel:require-form->module-id 
+				  req-form))) 
 	(loop for item in manifest append 
 		  (match item 
 				 ((list name :macro (funcall #'jsel:get-actual-name actual-name))
