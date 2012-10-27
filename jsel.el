@@ -541,7 +541,7 @@ sequence, without pre or postamble."
 (defun-match jsel:transcode ((list-rest 'while condexpr body) 
 							 (jsel:context-agnostic))
   "Transcode a while loop."
-  (jsel:transcode `(progn (primitive-while ,condexpr ,@body) undefined) :either))
+  (jsel:transcode `(let () (primitive-while ,condexpr ,@body) undefined) :either))
 
 
 (defun jsel:empty-vectorp (o)
@@ -883,6 +883,7 @@ allowed."
 			undefined)
 		 c))
 
+
 (defun jsel:make-last-element-a-setq (target elements)
   "Take a list of elements and transform the last element so that
 it `setq`s the target symbol to that element."
@@ -898,7 +899,7 @@ it `setq`s the target symbol to that element."
   "Transcode a try-catch expression."
   (let ((retval (gensym "try-retval")))
 	(recur `(let ((,retval undefined)) 
-			  (primitive-try ,(jsel:make-last-element-a-setq ,retval body-block)
+			  (primitive-try ,(jsel:make-last-element-a-setq retval body-block)
 							 (catch ,binding ,@catch-block)
 							 (finally undefined)) 
 			  ,retval))))
@@ -910,7 +911,7 @@ it `setq`s the target symbol to that element."
   "Transcode a try-finally expression."
   (let ((retval (gensym "try-retval"))
 		(exception (gensym "exception-")))
-	(recur `(let ((,retval undefined)) 
+	(recur `(let ((,retval undefined))
 			  (primitive-try ,(jsel:make-last-element-a-setq retval body-block)
 							 (catch ,exception (throw ,exception))
 							 (finally ,@finally-block)) 

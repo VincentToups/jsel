@@ -35,7 +35,7 @@
 
 (def tests (object))
 (def (Test-Results successes failures)
-	 (log "Entering Test-Results")
+ 	 (log "Entering Test-Results")
 	 (setq this.successes successes)
 	 (setq this.failures failures)
 	 (setq this.to-string 
@@ -335,18 +335,65 @@
 			 (+ "Recur-Handle " 
 				((map1 to-string* this.arguments)
 				 (join " ")))))
-  this)
+	 this)
 
-(defmacro* recur-point (&body body)
-  `(let ((recur 
-		  (lambda ()
-			(prefix (recur-value) 
+(def (current-recur-value)
+	 ([] recur-value-stack (- recur-value-stack.length 1)))
+
+(defmacro* with-recur-point (&body body)
+  (jsel:with-gensyms
+   (recur-object)
+   `(let ((,recur-object (object))) 
+	  (let ((recur 
+			 (lambda ()
+			   (new Recur-Handle ,recur-object
 					(arguments->array arguments)))))
-	 (try 
-	  (((.. recur-value-stack push) (create))
+		(try 
+		 (((.. recur-value-stack push) ,recur-object)
+		  ,@body)
+		 (finally
+		  ((.. recur-value-stack pop))))))))
+
+(def* (peek an-array)
+  ([] an-array (- an-array.length 1)))
+
+(def (local-recur-handle-p v)
+	 (and (instance-of v Recur-Handle)
+		  (=== v.key-value (current-recur-value))))
+
+(defmacro apply-recur (f-expr arguments-expr)
+  (jsel:with-gensyms 
+   (f result done arguments)
+   `(let ((,f ,f-expr)
+		  (,done false)
+		  (,result null)
+		  (,arguments ,arguments-expr))
+	  (while (not ,done)
+		(setq ,result (simple-apply ,f ,arguments))
+		(if (local-recur-handle-p ,result)
+			(progn 
+			  (setq ,arguments (.. ,result arguments)))
+		  (setq ,done true)))
+	  ,result)))
+
+(defmacro* let/recur (symbol-values-init &body body)
+  `(with-recur-point 
+	(apply-recur 
+	 (lambda ,(mapcar #'car symbol-values-init)
 	   ,@body)
-	  (finally
-	   ((.. recur-value-stack pop))))))
+	 [ ,@(mapcar #'cadr symbol-values-init) ])))
+
+(define-tests let/recur 
+  (simplest (=== :success
+				 (let/recur ((x 1)
+							 (y 1))
+							:success)))
+  (a-loop (=== 10
+			   (let/recur 
+				((x 0))
+				(if (< x 10)
+					(recur (+ x 1))
+				  x)))))
 
 (defmacro* match (value-expr &body clauses)
   (match clauses
@@ -363,16 +410,6 @@
 			  (if (primitive-=== *match-fail* ,result)
 				  (match ,value ,@subsequents)
 				,result))))))
-
-(defmacro apply-recur (f-expr &rest arguments-expr)
-  (jsel:with-gensyms 
-   (f result done aarguments)
-   `(let ((,f ,f-expr)
-		  (,done false)
-		  (,result null)
-		  (,arguments ,arguments-expr))
-	  (while (not ,done)
-		(setq ,result (apply )))))
 
 (defmacro match-lambda (&body clauses)
   (jsel:with-gensyms (value)
@@ -477,3 +514,8 @@
 
 
 (log (run-tests))
+(log (let/recur 
+				((x 0))
+				(if (< x 10)
+					(recur (+ x 1))
+				  x)))
